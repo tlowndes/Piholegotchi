@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 import requests
 
@@ -33,6 +34,14 @@ class AdGuard:
                       + s.get("num_replaced_safebrowsing", 0)
                       + s.get("num_replaced_parental", 0))
         pct = blocked / total * 100 if total else 0.0
+        today = None
+        hours = s.get("blocked_filtering")
+        if isinstance(hours, list) and hours:
+            # oldest first; the last entry is this hour (or today, on windows longer than a day)
+            if s.get("time_units") == "days":
+                today = int(hours[-1])
+            else:
+                today = int(sum(hours[-(datetime.now().hour + 1):]))
         if not status.get("protection_enabled", True):
-            return Stats(total, blocked, pct, online=False, note="BLOCKING IS OFF")
-        return Stats(total, blocked, pct)
+            return Stats(total, blocked, pct, online=False, note="BLOCKING IS OFF", today=today)
+        return Stats(total, blocked, pct, today=today)

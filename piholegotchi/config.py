@@ -29,6 +29,10 @@ class Config:
     music_mode: str = "nudges"  # while Spotify plays: "sleeve", "nudges" or "rotate"
     rotate_minutes: int = 2     # how long each screen stays up before the next
 
+    # Muncher moods
+    muncher_party: bool = True  # dance when today beats the best day so far
+    starve_minutes: int = 30    # starving face once blocking's been off this long (0 = never)
+
     # night mode: one quiet screen, no refreshes, panel asleep
     night: bool = True
     night_from: str = "23:00"

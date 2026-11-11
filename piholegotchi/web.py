@@ -250,6 +250,20 @@ def make_handler(state: "State"):
                 state.refresh_soon()
                 return self._json({"ok": True})
 
+            if path == "/api/muncher":
+                if "party" in body:
+                    cfg.muncher_party = bool(body["party"])
+                if body.get("starve") in (0, 10, 30, 60, 120):
+                    cfg.starve_minutes = body["starve"]
+                cfg.save()
+                state.refresh_soon()
+                return self._json({"ok": True})
+
+            if path == "/api/muncher/party":
+                state.moods.party_now(cfg)
+                state.refresh_soon()
+                return self._json({"ok": True})
+
             if path == "/api/night":
                 for k in ("from", "to"):
                     if k in body and not TIME_RE.match(str(body[k])):

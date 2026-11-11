@@ -21,6 +21,7 @@ from PIL import Image
 from . import schedule
 from .adguard import AdGuard
 from .config import Config
+from .moods import Moods
 from .render import Stats, mood, muncher, setup_screen, sleeve
 from .screens import draw
 from .server import Glances
@@ -65,6 +66,7 @@ class State:
         self.error = ""                   # shown on the settings page
         self.restart = False              # set after an update is installed
         self.data: dict = {}              # latest weather, server, bins, reminders (for the picker)
+        self.moods = Moods()
 
     def publish(self, img, screen, detail, stats):
         with self.lock:
@@ -170,7 +172,8 @@ def main():
     signal.signal(signal.SIGINT, stop)
 
     cfg, src = None, None
-    stats, next_stats = None, 0.0
+    stats, raw, next_stats = None, None, 0.0
+    moods = state.moods
     weather, next_weather = None, 0.0
     server, next_server = None, 0.0
     track, paused_since = None, None
@@ -195,8 +198,9 @@ def main():
         if state.stats_stale:
             state.stats_stale, next_stats, next_weather, next_server = False, 0, 0, 0
         if now >= next_stats:
-            stats = src.adguard.stats() if cfg.adguard_url else Stats(0, 0, 0.0, online=False, note="SET UP ADGUARD")
+            raw = src.adguard.stats() if cfg.adguard_url else Stats(0, 0, 0.0, online=False, note="SET UP ADGUARD")
             next_stats = now + STATS_EVERY
+        stats = moods.apply(raw, cfg)
         on = cfg.screens
         if on.get("weather") and src.weather.configured and now >= next_weather:
             weather, next_weather = src.weather.get(), now + WEATHER_EVERY
@@ -242,6 +246,8 @@ def main():
         else:
             night = None
             name = plan(cfg, track is not None, nudges, ambient, now, st)
+            if name != "sleeve" and on.get("muncher") and mood(stats) in ("party", "starving"):
+                name = "muncher"                  # a record or a hungry Muncher takes over the screen
             style = cfg.styles.get(name, "A")
             if name == "sleeve" and track:
                 img, key = sleeve(track), ("sleeve", track.id)

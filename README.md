@@ -31,6 +31,8 @@ The panel is 250 × 122 pixels, black or white, with no greys. Every screen is d
 | 12–22% | Content | <img src="docs/screens/muncher-content.png" width="250" alt="Content: happy eyes, chewing"> |
 | over 22% | Stuffed | <img src="docs/screens/muncher-stuffed.png" width="250" alt="Stuffed: happy eyes, ads flying in"> |
 | AdGuard down | Asleep | <img src="docs/screens/muncher-asleep.png" width="250" alt="Asleep: closed eyes, Zzz"> |
+| Today beats the best day | Party | <img src="docs/screens/muncher-party.png" width="250" alt="Party: dancing with arms up, music notes"> |
+| Blocking off for a while | Starving | <img src="docs/screens/muncher-starving.png" width="250" alt="Starving: pleading eyes, tongue out, drooling"> |
 
 ### More screens
 

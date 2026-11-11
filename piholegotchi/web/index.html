@@ -202,6 +202,20 @@ button.x{padding:8px 10px;color:var(--muted)}
     <p class="msg" id="sc-msg" role="status"></p>
   </section>
 
+  <section aria-labelledby="mm-h">
+    <div class="sechead"><h2 id="mm-h">Muncher moods</h2></div>
+    <label class="switch" for="mu-party">
+      <input type="checkbox" id="mu-party" role="switch">
+      <span><b>Dance on record days</b><br><span class="hint">When today's blocking beats the best day so far, the Muncher dances for an hour.</span></span>
+    </label>
+    <div class="grid2">
+      <div class="field"><label for="mu-starve">Starving face when blocking's been off for</label>
+        <select id="mu-starve"><option value="10">10 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option><option value="120">2 hours</option><option value="0">Never</option></select></div>
+    </div>
+    <div class="row"><button type="button" id="mu-show">Show me the dance</button></div>
+    <p class="msg" id="mu-msg" role="status"></p>
+  </section>
+
   <section aria-labelledby="nt-h">
     <div class="sechead"><h2 id="nt-h">Night mode</h2><span id="nt-pill" class="pill off">Off</span></div>
     <p class="lead">One quiet screen overnight. The e-ink is left alone and powered down until morning.</p>
@@ -331,6 +345,7 @@ async function poll(){
       cfg.reminders.forEach(addRem); paintRemStatus();
       $('flip').checked = !!cfg.flip;
       buildNight(cfg);
+      $('mu-party').checked = !!cfg.muncher_party; $('mu-starve').value = String(cfg.starve_minutes);
       $('sp-client').value = cfg.spotify_client_id || '';
       $('ag-url').value = cfg.adguard_url || '';
       $('ag-user').value = cfg.adguard_username || '';
@@ -421,6 +436,18 @@ async function saveRotation(change){
 }
 $('rotate').addEventListener('change', () => saveRotation({rotate_minutes: Number($('rotate').value)}));
 document.querySelectorAll('input[name=music]').forEach(r => r.addEventListener('change', () => saveRotation({music_mode: r.value})));
+
+/* Muncher moods */
+async function saveMuncher(){
+  try{ await api('/api/muncher', {party: $('mu-party').checked, starve: Number($('mu-starve').value)}); say($('mu-msg'), 'Saved.', true); setTimeout(() => say($('mu-msg'), ''), 2000); }
+  catch(e){ say($('mu-msg'), e.message); }
+}
+$('mu-party').addEventListener('change', saveMuncher);
+$('mu-starve').addEventListener('change', saveMuncher);
+$('mu-show').addEventListener('click', async () => {
+  try{ await api('/api/muncher/party', {}); say($('mu-msg'), 'Dancing for a minute. Watch the screen above.', true); setTimeout(poll, 2000); }
+  catch(e){ say($('mu-msg'), e.message); }
+});
 
 /* Night mode */
 function buildNight(cfg){

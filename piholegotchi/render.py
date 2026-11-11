@@ -139,6 +139,11 @@ class Stats:
     percent: float
     online: bool = True
     note: str = ""          # why it's offline, shown on the asleep screen
+    today: int | None = None    # blocked since midnight, from AdGuard's hourly counts
+    mood: str = ""          # set by moods.py: "party" or "starving" (overrides the block rate)
+    beat: int = 0           # party: the old record
+    off_mins: int = 0       # starving: how long blocking has been off
+    frame: int = 0          # party: which dance pose
 
 
 def mmss(s: int) -> str:
@@ -195,6 +200,8 @@ def sleeve(t: Track) -> Image.Image:
 # ---------------------------------------------------------------- 4D Muncher
 
 def mood(s: Stats | None) -> str:
+    if s is not None and s.mood:
+        return s.mood
     if s is None or not s.online:
         return "asleep"
     if s.percent < 12:
@@ -244,6 +251,66 @@ def _creature(c: Canvas, m: str):
         c.rect(cx - 2, 72, 9, 7)   # a chewed ad
 
 
+def _party(c: Canvas, frame: int):
+    """Dancing: the whole creature hops and leans, eyes shut with joy."""
+    from PIL import ImageChops
+    sub = Canvas()
+    _creature(sub, "content")
+    d = sub.d
+    cx = 48
+    d.ellipse([cx - 22, 45, cx + 22, 60], fill=INK)          # wipe the eyes
+    for ex in (cx - 12, cx + 11):                              # ^ ^
+        d.line([(ex - 5, 56), (ex, 50), (ex + 5, 56)], fill=PAPER, width=2)
+    d.rectangle([cx - 2, 72, cx + 7, 79], fill=PAPER)          # no ad: singing
+    for side in (-1, 1):                                       # little arms, one up one out
+        up = (side == -1) == (frame % 2 == 0)
+        sx = cx + side * 30
+        tip = (sx + side * 10, 34) if up else (sx + side * 12, 58)
+        d.line([(sx, 60), tip], fill=INK, width=4)
+        d.ellipse([tip[0] - 3, tip[1] - 3, tip[0] + 3, tip[1] + 3], fill=INK)
+    body = sub.img.crop((0, 8, 100, 92))
+    lean = -12 if frame % 2 == 0 else 12
+    body = body.rotate(lean, resample=Image.NEAREST, center=(48, 76), fillcolor=PAPER)
+    dx, dy = (-3, -5) if frame % 2 == 0 else (3, -1)
+    c.img.paste(ImageChops.darker(c.img.crop((dx, 8 + dy, dx + 100, 92 + dy)), body), (dx, 8 + dy))
+    d = c.d
+    # music notes and confetti swap sides each pose
+    nx = 96 if frame % 2 == 0 else 6
+    for i, (x, y) in enumerate(((nx, 30), (nx + 10, 18))):
+        d.ellipse([x, y + 8, x + 6, y + 13], fill=INK)
+        d.line([(x + 5, y + 10), (x + 5, y)], fill=INK, width=2)
+        if i:
+            d.line([(x + 5, y), (x - 5, y + 3)], fill=INK, width=2)
+    for x, y in ((14, 14) if frame % 2 else (104, 74), (100, 8) if frame % 2 else (6, 70), (110, 96), (2, 100)):
+        d.rectangle([x, y, x + 2, y + 2], fill=INK)
+    c.rect(18, 96, 60, 1)                                      # the dance floor
+
+
+def _starving(c: Canvas):
+    """Blocking's been off a while: thin, sad brows, tongue out, a drip of drool."""
+    d = c.d
+    cx, cy = 48, 62
+    d.line([(cx + 4, 36), (cx + 9, 26), (cx + 12, 22), (cx + 17, 22)], fill=INK, width=2)   # droopy antenna
+    d.ellipse([cx + 15, 22, cx + 23, 30], fill=PAPER, outline=INK, width=2)
+    c.rect(cx - 16, 84, 8, 7)
+    c.rect(cx + 6, 84, 8, 7)
+    d.ellipse([cx - 28, cy - 26, cx + 28, cy + 26], fill=INK)
+    for ex, k in ((cx - 11, 1), (cx + 10, -1)):
+        d.ellipse([ex - 6, 46, ex + 6, 58], fill=PAPER)        # big pleading eyes
+        d.ellipse([ex - 2, 50, ex + 3, 56], fill=INK)
+        d.line([(ex - 6, 43 + 2 * k), (ex + 6, 43 - 2 * k)], fill=PAPER, width=2)   # worried brows
+    d.ellipse([cx - 10, 62, cx + 10, 76], fill=PAPER)          # empty open mouth
+    d.ellipse([cx - 5, 70, cx + 5, 80], fill=PAPER, outline=INK, width=1)   # tongue
+    d.line([(cx, 71), (cx, 76)], fill=INK)
+    d.ellipse([cx + 8, 76, cx + 12, 82], fill=PAPER)          # drool
+    d.ellipse([cx + 8, 84, cx + 12, 89], fill=INK)
+    d.rectangle([cx + 9, 82, cx + 11, 85], fill=INK)
+
+
+def _hm(mins: int) -> str:
+    return f"{mins // 60}H {mins % 60:02d}M" if mins >= 60 else f"{mins} MIN"
+
+
 def _ad_chunks(c: Canvas, count: int):
     for l, t in [(82, 36), (90, 60), (80, 84)][:count]:
         c.box(l, t, 15, 11)
@@ -255,7 +322,8 @@ def _ad_chunks(c: Canvas, count: int):
 def muncher(s: Stats | None) -> Image.Image:
     c = Canvas()
     m = mood(s)
-    _creature(c, m)
+    if m not in ("party", "starving"):
+        _creature(c, m)
     x = 130
     if m == "asleep":
         c.text((96, 40), "z", vt(16))
@@ -266,6 +334,27 @@ def muncher(s: Stats | None) -> Image.Image:
         c.rect(x, 82, 112, 1)
         c.text((x, 96), "MOOD: ASLEEP", pix())
         c.text((x, 109), "CHECK THE PI", pix())
+        return c.finish()
+
+    if m == "party":
+        _party(c, s.frame)
+        c.text((x, 24), "NEW RECORD TODAY", pix())
+        n = s.today if s.today is not None else s.blocked
+        num, nf = fit_size(gb(n), 112, (30, 26, 22), grot)
+        c.text((x - 1, 53), num, nf)
+        c.text((x, 70), "ads. Party!", vt(20))
+        c.rect(x, 82, 112, 1)
+        c.text((x, 96), "MOOD: PARTY", pix())
+        c.text((x, 109), fit(f"OLD BEST {gb(s.beat)}", 112, pix()), pix())
+        return c.finish()
+    if m == "starving":
+        _starving(c)
+        c.text((x, 24), "BLOCKING IS OFF", pix())
+        c.text((x - 1, 53), "Starving.", grot(26))
+        c.text((x, 70), "Feed me ads.", vt(20))
+        c.rect(x, 82, 112, 1)
+        c.text((x, 96), "MOOD: STARVING", pix())
+        c.text((x, 109), f"OFF FOR {_hm(s.off_mins)}", pix())
         return c.finish()
 
     _ad_chunks(c, {"hungry": 0, "content": 2, "stuffed": 3}[m])
