@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 from PIL import Image
 
-from . import spotify_auth
+from . import spotify_auth, updater
 from .adguard import AdGuard
 from .config import Config
 from .spotify import TOKEN_FILE
@@ -40,6 +40,7 @@ def _png(img1: Image.Image, scale: int = 4) -> bytes:
 
 def make_handler(state: "State"):
     pending: dict[str, spotify_auth.Pending] = {}
+    update_status = {"busy": False, "message": ""}
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "Piholegotchi"
@@ -96,6 +97,8 @@ def make_handler(state: "State"):
                     }
                 out["config"] = cfg.public()
                 out["spotify_connected"] = TOKEN_FILE.exists()
+                out["version"] = updater.installed()[:7]
+                out["update"] = dict(update_status)
                 return self._json(out)
             self._send(404, b"not found", "text/plain")
 
@@ -158,6 +161,43 @@ def make_handler(state: "State"):
             if path == "/api/spotify/disconnect":
                 TOKEN_FILE.unlink(missing_ok=True)
                 state.refresh_soon()
+                return self._json({"ok": True})
+
+            if path == "/api/screen":
+                cfg.flip = bool(body.get("flip"))
+                cfg.save()
+                state.refresh_soon()
+                return self._json({"ok": True})
+
+            if path == "/api/update/check":
+                try:
+                    new = updater.latest()
+                except Exception as e:  # noqa: BLE001
+                    return self._json({"error": f"Couldn't reach GitHub: {e}"}, 502)
+                mine = updater.installed()
+                new["current"] = bool(mine) and mine == new["sha"]
+                new["short"] = new["sha"][:7]
+                return self._json(new)
+
+            if path == "/api/update/install":
+                sha = (body.get("sha") or "").strip()
+                if len(sha) != 40 or any(ch not in "0123456789abcdef" for ch in sha):
+                    return self._json({"error": "Check for updates first."}, 400)
+                if update_status["busy"]:
+                    return self._json({"error": "An update is already running."}, 409)
+
+                def run():
+                    update_status.update(busy=True, message="Downloading…")
+                    try:
+                        updater.install(sha)
+                        update_status.update(message="Installed. Restarting…")
+                        state.restart = True
+                        state.wake.set()
+                    except Exception as e:  # noqa: BLE001
+                        log.exception("update failed")
+                        update_status.update(busy=False, message=f"Update failed: {e}")
+
+                threading.Thread(target=run, daemon=True).start()
                 return self._json({"ok": True})
 
             if path == "/api/refresh":

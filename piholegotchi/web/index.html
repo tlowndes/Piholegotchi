@@ -72,6 +72,13 @@ code.copy button{font:500 12px var(--sans);padding:2px 8px;white-space:nowrap;fl
 .msg.ok{color:var(--good)} .msg.err{color:var(--bad)}
 a{color:var(--accent)}
 footer{color:var(--muted);font-size:13px;text-align:center}
+.switch{display:flex;gap:14px;align-items:flex-start;cursor:pointer;font-weight:400;font-size:15px}
+.switch input{appearance:none;flex:none;width:42px;height:24px;border-radius:999px;background:var(--line);position:relative;cursor:pointer;margin:2px 0 0;padding:0;border:0;transition:background .15s}
+.switch input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .15s}
+.switch input:checked{background:var(--accent)}
+.switch input:checked::after{transform:translateX(18px)}
+.switch b{font-weight:500}
+.hint{color:var(--muted);font-size:13.5px}
 [hidden]{display:none!important}
 @media (max-width:520px){.device{padding:9px 9px 6px;border-radius:10px}.glass{padding:4px}}
 @media (prefers-reduced-motion:no-preference){.glass img{transition:opacity .25s}}
@@ -146,6 +153,24 @@ footer{color:var(--muted);font-size:13px;text-align:center}
     </form>
   </section>
 
+  <section aria-labelledby="sc-h">
+    <div class="sechead"><h2 id="sc-h">Screen</h2></div>
+    <label class="switch" for="flip">
+      <input type="checkbox" id="flip" role="switch">
+      <span><b>Flip upside down</b><br><span class="hint">For when the Pi is mounted with the cable on top.</span></span>
+    </label>
+  </section>
+
+  <section aria-labelledby="up-h">
+    <div class="sechead"><h2 id="up-h">Software</h2><span id="ver" class="pill off">…</span></div>
+    <p class="lead" id="up-text">Get the latest Piholegotchi from GitHub. Your settings are kept.</p>
+    <div class="row">
+      <button type="button" id="up-check">Check for updates</button>
+      <button type="button" class="primary" id="up-install" hidden>Update now</button>
+    </div>
+    <p class="msg" id="up-msg" role="status"></p>
+  </section>
+
   <footer>Piholegotchi runs on this Pi. Settings are saved on the Pi only.</footer>
 </div>
 
@@ -182,8 +207,11 @@ async function poll(){
     const ag = cfg.adguard_url ? (st && st.online ? 'Connected' : (st && st.note === 'BLOCKING IS OFF' ? 'Blocking off' : 'Can’t reach')) : 'Not set up';
     $('ag-pill').textContent = ag; $('ag-pill').className = 'pill ' + (ag === 'Connected' ? 'on' : 'off');
     pwSet = cfg.adguard_password_set;
+    $('ver').textContent = s.version ? 'Version ' + s.version : 'Version unknown';
+    if (s.update && s.update.message){ say($('up-msg'), s.update.message, !/failed/i.test(s.update.message)); }
     if (!loaded){
       loaded = true;
+      $('flip').checked = !!cfg.flip;
       $('sp-client').value = cfg.spotify_client_id || '';
       $('ag-url').value = cfg.adguard_url || '';
       $('ag-user').value = cfg.adguard_username || '';
@@ -225,6 +253,41 @@ async function adguard(save){
 }
 $('ag-form').addEventListener('submit', e => { e.preventDefault(); adguard(true); });
 $('ag-test').addEventListener('click', () => adguard(false));
+
+/* Screen */
+$('flip').addEventListener('change', async () => {
+  try{ await api('/api/screen', {flip: $('flip').checked}); setTimeout(poll, 2500); }
+  catch(e){ $('flip').checked = !$('flip').checked; }
+});
+
+/* Software */
+let latestSha = '';
+$('up-check').addEventListener('click', async () => {
+  say($('up-msg'), 'Checking…', true); $('up-install').hidden = true;
+  try{
+    const r = await api('/api/update/check', {});
+    if (r.current){ say($('up-msg'), 'You\u2019re on the latest version.', true); return; }
+    latestSha = r.sha;
+    say($('up-msg'), 'Version ' + r.short + ' is available (' + r.date + '): ' + r.message, true);
+    $('up-install').hidden = false;
+  }catch(e){ say($('up-msg'), e.message); }
+});
+$('up-install').addEventListener('click', async () => {
+  $('up-install').disabled = true;
+  try{
+    await api('/api/update/install', {sha: latestSha});
+    say($('up-msg'), 'Downloading…', true);
+    const started = Date.now();
+    const wait = setInterval(async () => {
+      try{
+        const s = await api('/api/state');
+        if (s.version === latestSha.slice(0, 7)){ clearInterval(wait); say($('up-msg'), 'Updated to ' + s.version + '.', true); $('up-install').hidden = true; $('up-install').disabled = false; }
+        else if (s.update && /failed/i.test(s.update.message)){ clearInterval(wait); $('up-install').disabled = false; }
+      }catch(e){ say($('up-msg'), 'Restarting…', true); }
+      if (Date.now() - started > 180000){ clearInterval(wait); say($('up-msg'), 'This is taking a while. Refresh the page in a minute.'); }
+    }, 3000);
+  }catch(e){ say($('up-msg'), e.message); $('up-install').disabled = false; }
+});
 
 /* Misc */
 $('refresh').addEventListener('click', async () => { try{ await api('/api/refresh', {}); setTimeout(poll, 1500); }catch(e){} });

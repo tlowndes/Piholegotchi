@@ -56,6 +56,7 @@ echo "==> Copying Piholegotchi in"
 install -d "$ROOT/opt/piholegotchi"
 cp -r "$REPO/piholegotchi" "$ROOT/opt/piholegotchi/"
 find "$ROOT/opt/piholegotchi" -name __pycache__ -prune -exec rm -rf {} +
+echo "${GITHUB_SHA:-$(git -c safe.directory="*" -C "$REPO" rev-parse HEAD)}" > "$ROOT/opt/piholegotchi/piholegotchi/VERSION"
 install -d "$ROOT/opt/piholegotchi/vendor/waveshare_epd"
 base=https://raw.githubusercontent.com/waveshareteam/e-Paper/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd
 for f in __init__.py epdconfig.py epd2in13_V4.py; do

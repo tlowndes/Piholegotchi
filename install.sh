@@ -18,6 +18,8 @@ for f in __init__.py epdconfig.py epd2in13_V4.py; do
   curl -fsSL "$base/$f" -o "vendor/waveshare_epd/$f"
 done
 
+git rev-parse HEAD > piholegotchi/VERSION 2>/dev/null || true
+
 echo "==> Installing the service"
 sudo tee /etc/systemd/system/piholegotchi.service >/dev/null <<UNIT
 [Unit]
@@ -28,10 +30,12 @@ Wants=network-online.target
 [Service]
 User=$USER
 WorkingDirectory=$HERE
+# updates from the settings page land in ~/.config/piholegotchi/app and take priority
+Environment=PYTHONPATH=$HOME/.config/piholegotchi/app:$HERE
 ExecStart=/usr/bin/python3 -m piholegotchi
 # lets the settings page use port 80 without running as root
 AmbientCapabilities=CAP_NET_BIND_SERVICE
-Restart=on-failure
+Restart=always
 RestartSec=10
 
 [Install]
