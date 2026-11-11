@@ -10,7 +10,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-from .render import Stats, Track, atkinson, muncher, sleeve, H, W
+from .render import Stats, Track, atkinson, muncher, setup_screen, sleeve, H, W
 
 PAPER_RGB, INK_RGB = (220, 220, 210), (37, 39, 42)
 
@@ -53,6 +53,7 @@ def main():
         "muncher-content": muncher(Stats(15_210, 2_710, 17.8)),
         "muncher-hungry": muncher(Stats(9_880, 640, 6.5)),
         "muncher-asleep": muncher(Stats(0, 0, 0, online=False)),
+        "setup": setup_screen("piholegotchi", "192.168.1.42"),
     }
     for name, img in shots.items():
         img.save(out / f"{name}-1bit.png")

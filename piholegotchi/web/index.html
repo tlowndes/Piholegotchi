@@ -166,7 +166,7 @@ async function poll(){
   try{
     const s = await api('/api/state');
     if (s.frame !== lastFrame){ lastFrame = s.frame; $('screen').src = '/screen.png?f=' + s.frame; }
-    const what = s.screen === 'sleeve' ? 'Sleeve' : s.screen === 'muncher' ? 'Muncher' : 'Starting';
+    const what = {sleeve:'Sleeve', muncher:'Muncher', setup:'the setup screen'}[s.screen] || 'Starting';
     $('now').innerHTML = '';
     const b = document.createElement('b'); b.textContent = 'Showing ' + what;
     $('now').append(b, document.createTextNode((s.detail ? ' · ' + s.detail : '') + ' · updated ' + ago(s.now - s.updated)));

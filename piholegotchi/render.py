@@ -278,3 +278,20 @@ def muncher(s: Stats | None) -> Image.Image:
     c.text((x, 96), mood_line, pix())
     c.text((x, 109), fit(f"{s.percent:.1f}% OF {gb(s.total)}", 112, pix()), pix())
     return c.finish()
+
+
+# ---------------------------------------------------------------- first boot
+
+def setup_screen(host: str, ip: str) -> Image.Image:
+    """Shown until anything is set up: tells you where the settings page is."""
+    c = Canvas()
+    _creature(c, "hungry")
+    x = 130
+    c.text((x, 24), "HELLO, I'M NEW", pix())
+    c.text((x - 1, 47), "Set me up", grot(20))
+    c.text((x, 63), "on your phone at", vt(18))
+    c.rect(x, 72, 112, 1)
+    c.text((x, 87), fit(f"{host}.local", 112, pix()), pix())
+    if ip:
+        c.text((x, 100), "OR " + ip, pix())
+    return c.finish()

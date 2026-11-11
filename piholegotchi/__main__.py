@@ -10,6 +10,7 @@ import argparse
 import logging
 import os
 import signal
+import socket
 import threading
 import time
 
@@ -17,7 +18,7 @@ from PIL import Image
 
 from .adguard import AdGuard
 from .config import Config
-from .render import Stats, mood, muncher, sleeve
+from .render import Stats, mood, muncher, setup_screen, sleeve
 from .spotify import Spotify
 
 log = logging.getLogger("piholegotchi")
@@ -26,6 +27,16 @@ SPOTIFY_EVERY = 10        # seconds between Spotify checks (and progress bar upd
 STATS_EVERY = 300         # seconds between AdGuard stat updates
 PAUSE_GRACE = 120         # keep showing a paused track this long before switching back
 FULL_EVERY = 30           # force a full refresh after this many partials (clears ghosting)
+
+
+def local_ip() -> str:
+    """The Pi's address on the home network (no traffic is sent)."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("192.0.2.1", 9))
+            return s.getsockname()[0]
+    except OSError:
+        return ""
 
 
 class State:
@@ -111,7 +122,11 @@ def main():
         else:
             track, paused_since = None, None
 
-        if track:
+        if not cfg.adguard_url and not spotify.configured:
+            ip = local_ip()
+            img, key = setup_screen(socket.gethostname(), ip), ("setup", ip)
+            detail = "Waiting to be set up"
+        elif track:
             img, key = sleeve(track), ("sleeve", track.id)
             detail = f"{track.title} by {track.artist}"
         else:
