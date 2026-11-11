@@ -32,6 +32,7 @@ The panel is 250 × 122 pixels, black or white, with no greys. Every screen is d
 | over 22% | Stuffed | <img src="docs/screens/muncher-stuffed.png" width="250" alt="Stuffed: happy eyes, ads flying in"> |
 | AdGuard down | Asleep | <img src="docs/screens/muncher-asleep.png" width="250" alt="Asleep: closed eyes, Zzz"> |
 | Today beats the best day | Party | <img src="docs/screens/muncher-party.png" width="250" alt="Party: dancing with arms up, music notes"> |
+| Paused from the settings page | Snoozing | <img src="docs/screens/muncher-paused.png" width="250" alt="Snoozing: asleep, On a break, back at a set time"> |
 | Blocking off for a while | Starving | <img src="docs/screens/muncher-starving.png" width="250" alt="Starving: pleading eyes, tongue out, drooling"> |
 
 ### More screens
@@ -50,6 +51,7 @@ Each has three styles, picked on the settings page. Bins and reminders only show
 - **Server health** reads [Glances](https://github.com/nicolargo/glances), which you install from the ZimaOS app store. It shows the biggest drive, checked every minute.
 - **Bin day** shows from 4pm the day before until 10am on the day. You enter each bin's next collection date and how often it goes out.
 - **Plants and pets** are reminders you add on the settings page, and tick off there with **Done**.
+- **Pause ads** on the settings page turns AdGuard's blocking off for 1 to 60 minutes (5 by default), handy for getting past a blocked link. AdGuard turns it back on by itself. Needs AdGuard Home v0.107.27 or newer.
 - **Night mode** shows one quiet screen from 11pm to 7am (change the times on the settings page), then powers the panel down so it isn't refreshed until morning. Music still wakes it for Sleeve unless you turn that off.
 
 ## Hardware

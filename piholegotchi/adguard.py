@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime
 
 import requests
@@ -43,5 +44,21 @@ class AdGuard:
             else:
                 today = int(sum(hours[-(datetime.now().hour + 1):]))
         if not status.get("protection_enabled", True):
+            left = int(status.get("protection_disabled_duration") or 0) / 1000   # ms left on a pause
+            if left > 0:
+                return Stats(total, blocked, pct, online=False, note="BLOCKING PAUSED", today=today,
+                             paused_until=time.time() + left)
             return Stats(total, blocked, pct, online=False, note="BLOCKING IS OFF", today=today)
         return Stats(total, blocked, pct, today=today)
+
+    def protect(self, on: bool, minutes: int = 0):
+        """Turn blocking on, or off (for `minutes`, then AdGuard turns it back on by itself)."""
+        body = {"enabled": on}
+        if not on and minutes:
+            body["duration"] = minutes * 60_000
+        r = requests.post(f"{self.base}/protection", json=body, auth=self.auth, timeout=5)
+        if r.status_code == 404 and (on or not minutes):     # AdGuard Home before v0.107.27
+            r = requests.post(f"{self.base}/dns_config", json={"protection_enabled": on}, auth=self.auth, timeout=5)
+        elif r.status_code == 404:
+            raise RuntimeError("This AdGuard Home is too old for timed pauses. Update it from the ZimaOS app store.")
+        r.raise_for_status()

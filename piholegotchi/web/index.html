@@ -130,6 +130,17 @@ button.x{padding:8px 10px;color:var(--muted)}
     <button class="quiet" id="refresh" type="button">Refresh screen</button>
   </div>
 
+  <section aria-labelledby="pz-h" id="pz" hidden>
+    <div class="sechead"><h2 id="pz-h">Ad blocking</h2><span id="pz-pill" class="pill on">On</span></div>
+    <p class="lead" id="pz-text">Need to get past a blocked link? Pause it for a bit. It comes back on by itself.</p>
+    <div class="row">
+      <button class="primary" type="button" id="pz-go">Pause ads for 5 minutes</button>
+      <select id="pz-mins" aria-label="How long to pause for"><option value="1">1 min</option><option value="5">5 min</option><option value="10">10 min</option><option value="30">30 min</option><option value="60">1 hour</option></select>
+      <button type="button" id="pz-stop" hidden>Turn blocking back on</button>
+    </div>
+    <p class="msg" id="pz-msg" role="status"></p>
+  </section>
+
   <section aria-labelledby="sp-h">
     <div class="sechead"><h2 id="sp-h">Spotify</h2><span id="sp-pill" class="pill off">Not connected</span></div>
 
@@ -322,6 +333,7 @@ async function poll(){
     const ag = cfg.adguard_url ? (st && st.online ? 'Connected' : (st && st.note === 'BLOCKING IS OFF' ? 'Blocking off' : 'Can’t reach')) : 'Not set up';
     $('ag-pill').textContent = ag; $('ag-pill').className = 'pill ' + (ag === 'Connected' ? 'on' : 'off');
     pwSet = cfg.adguard_password_set;
+    paintPause(cfg, st, s.now);
     $('ver').textContent = s.version ? 'Version ' + s.version : 'Version unknown';
     if (s.update && s.update.message){ say($('up-msg'), s.update.message, !/failed/i.test(s.update.message)); }
     $('wx-pill').textContent = cfg.weather_name ? cfg.weather_name : 'Not set up'; $('wx-pill').className = 'pill ' + (cfg.weather_name ? 'on' : 'off');
@@ -345,6 +357,7 @@ async function poll(){
       cfg.reminders.forEach(addRem); paintRemStatus();
       $('flip').checked = !!cfg.flip;
       buildNight(cfg);
+      $('pz-mins').value = String(cfg.pause_minutes || 5); pzLabel();
       $('mu-party').checked = !!cfg.muncher_party; $('mu-starve').value = String(cfg.starve_minutes);
       $('sp-client').value = cfg.spotify_client_id || '';
       $('ag-url').value = cfg.adguard_url || '';
@@ -436,6 +449,37 @@ async function saveRotation(change){
 }
 $('rotate').addEventListener('change', () => saveRotation({rotate_minutes: Number($('rotate').value)}));
 document.querySelectorAll('input[name=music]').forEach(r => r.addEventListener('change', () => saveRotation({music_mode: r.value})));
+
+/* Pause blocking */
+function pzLabel(){ const m = Number($('pz-mins').value); $('pz-go').textContent = 'Pause ads for ' + (m === 60 ? '1 hour' : m + (m === 1 ? ' minute' : ' minutes')); }
+function paintPause(cfg, st, now){
+  $('pz').hidden = !cfg.adguard_url;
+  const paused = st && st.note === 'BLOCKING PAUSED', off = st && st.note === 'BLOCKING IS OFF';
+  const pill = paused ? 'Paused' : off ? 'Off' : (st && st.online ? 'On' : 'Can’t reach');
+  $('pz-pill').textContent = pill; $('pz-pill').className = 'pill ' + (pill === 'On' ? 'on' : 'off');
+  if (paused){
+    const left = Math.max(1, Math.ceil((st.paused_until - now) / 60));
+    $('pz-text').textContent = 'Paused. Ads get through for about ' + left + (left === 1 ? ' more minute.' : ' more minutes.');
+  } else if (off){
+    $('pz-text').textContent = 'Blocking is switched off in AdGuard.';
+  } else {
+    $('pz-text').textContent = 'Need to get past a blocked link? Pause it for a bit. It comes back on by itself.';
+  }
+  $('pz-go').hidden = $('pz-mins').hidden = paused || off; $('pz-stop').hidden = !(paused || off);
+}
+$('pz-mins').addEventListener('change', pzLabel);
+$('pz-go').addEventListener('click', async () => {
+  $('pz-go').disabled = true; say($('pz-msg'), 'Pausing…', true);
+  try{ await api('/api/pause', {minutes: Number($('pz-mins').value)}); say($('pz-msg'), ''); setTimeout(poll, 1500); }
+  catch(e){ say($('pz-msg'), e.message); }
+  $('pz-go').disabled = false;
+});
+$('pz-stop').addEventListener('click', async () => {
+  $('pz-stop').disabled = true;
+  try{ await api('/api/resume', {}); say($('pz-msg'), 'Blocking’s back on.', true); setTimeout(() => say($('pz-msg'), ''), 3000); setTimeout(poll, 1500); }
+  catch(e){ say($('pz-msg'), e.message); }
+  $('pz-stop').disabled = false;
+});
 
 /* Muncher moods */
 async function saveMuncher(){

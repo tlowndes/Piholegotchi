@@ -200,6 +200,8 @@ def main():
         if now >= next_stats:
             raw = src.adguard.stats() if cfg.adguard_url else Stats(0, 0, 0.0, online=False, note="SET UP ADGUARD")
             next_stats = now + STATS_EVERY
+            if raw.paused_until:                  # check again just after a pause ends
+                next_stats = min(next_stats, raw.paused_until + 5)
         stats = moods.apply(raw, cfg)
         on = cfg.screens
         if on.get("weather") and src.weather.configured and now >= next_weather:
@@ -246,7 +248,8 @@ def main():
         else:
             night = None
             name = plan(cfg, track is not None, nudges, ambient, now, st)
-            if name != "sleeve" and on.get("muncher") and mood(stats) in ("party", "starving"):
+            if name != "sleeve" and on.get("muncher") and (mood(stats) in ("party", "starving")
+                                                         or stats.note == "BLOCKING PAUSED"):
                 name = "muncher"                  # a record or a hungry Muncher takes over the screen
             style = cfg.styles.get(name, "A")
             if name == "sleeve" and track:

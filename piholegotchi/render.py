@@ -144,6 +144,7 @@ class Stats:
     beat: int = 0           # party: the old record
     off_mins: int = 0       # starving: how long blocking has been off
     frame: int = 0          # party: which dance pose
+    paused_until: float = 0.0   # blocking paused until this time (epoch seconds)
 
 
 def mmss(s: int) -> str:
@@ -325,6 +326,18 @@ def muncher(s: Stats | None) -> Image.Image:
     if m not in ("party", "starving"):
         _creature(c, m)
     x = 130
+    if m == "asleep" and s and s.note == "BLOCKING PAUSED":
+        from datetime import datetime
+        back = datetime.fromtimestamp(s.paused_until).strftime("%H:%M")
+        c.text((96, 40), "z", vt(16))
+        c.text((104, 30), "Z", vt(22))
+        c.text((x, 24), "BLOCKING PAUSED", pix())
+        c.text((x - 1, 53), "On a break.", grot(19))
+        c.text((x, 70), f"Back at {back}.", vt(20))
+        c.rect(x, 82, 112, 1)
+        c.text((x, 96), "MOOD: SNOOZING", pix())
+        c.text((x, 109), "ADS GET THROUGH", pix())
+        return c.finish()
     if m == "asleep":
         c.text((96, 40), "z", vt(16))
         c.text((104, 30), "Z", vt(22))

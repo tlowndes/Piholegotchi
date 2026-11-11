@@ -155,7 +155,7 @@ def make_handler(state: "State"):
                         "now": time.time(),
                         "stats": None if s is None else {
                             "total": s.total, "blocked": s.blocked, "percent": round(s.percent, 1),
-                            "online": s.online, "note": s.note},
+                            "online": s.online, "note": s.note, "paused_until": s.paused_until},
                     }
                 out["config"] = cfg.public()
                 now = datetime.now()
@@ -248,6 +248,25 @@ def make_handler(state: "State"):
                     cfg.rotate_minutes = body["rotate_minutes"]
                 cfg.save()
                 state.refresh_soon()
+                return self._json({"ok": True})
+
+            if path in ("/api/pause", "/api/resume"):
+                if not cfg.adguard_url:
+                    return self._json({"error": "Set up AdGuard Home first."}, 400)
+                pausing = path == "/api/pause"
+                if pausing:
+                    mins = body.get("minutes")
+                    if mins not in (1, 5, 10, 30, 60):
+                        return self._json({"error": "Pick how long to pause for."}, 400)
+                    if mins != cfg.pause_minutes:
+                        cfg.pause_minutes = mins
+                        cfg.save()
+                try:
+                    AdGuard(cfg.adguard_url, cfg.adguard_username, cfg.adguard_password).protect(
+                        not pausing, cfg.pause_minutes if pausing else 0)
+                except Exception as e:  # noqa: BLE001
+                    return self._json({"error": f"AdGuard didn't take it: {e}"}, 502)
+                state.refresh_soon(stats_too=True)
                 return self._json({"ok": True})
 
             if path == "/api/muncher":
