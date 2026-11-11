@@ -11,8 +11,8 @@ CONFIG_DIR = Path(os.environ.get("PIHOLEGOTCHI_HOME", Path.home() / ".config" / 
 CONFIG_FILE = CONFIG_DIR / "config.json"
 _lock = threading.Lock()
 
-DEFAULT_SCREENS = {"muncher": True, "weather": True, "server": True, "bins": True, "reminders": True}
-DEFAULT_STYLES = {"server": "A", "weather": "A", "bins": "A", "reminders": "A", "night": "A"}
+DEFAULT_SCREENS = {"muncher": True, "weather": True, "server": True, "calendar": True, "bins": True, "reminders": True}
+DEFAULT_STYLES = {"server": "A", "weather": "A", "bins": "A", "reminders": "A", "night": "A", "calendar": "A"}
 
 
 @dataclass
@@ -47,6 +47,9 @@ class Config:
     weather_lon: float = 0.0
 
     server_url: str = ""        # Glances on the server, e.g. http://192.168.1.20:61208
+
+    calendar_url: str = ""      # a shared ICS link, e.g. Proton Calendar's "Share with anyone"
+    calendar_heads_up: int = 15 # cut in this many minutes before an event (0 = never)
 
     # [{"name": "Black", "label": "Waste", "weekday": 3, "every": 1, "from": "2026-11-12"}]
     bins: list = field(default_factory=list)

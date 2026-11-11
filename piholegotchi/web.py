@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING
 from PIL import Image
 
 from . import schedule, spotify_auth, updater, weather
+from .calendar_feed import CalendarSource, clean_url
 from .adguard import AdGuard
 from .config import DEFAULT_SCREENS, Config
 from .screens import STYLES, draw, samples
@@ -129,7 +130,7 @@ def make_handler(state: "State"):
             if path == "/preview.png":
                 q = parse_qs(self.path.partition("?")[2])
                 name, style = q.get("screen", [""])[0], q.get("style", ["A"])[0]
-                if name not in ("server", "weather", "bins", "reminders", "night") or style not in STYLES:
+                if name not in ("server", "weather", "bins", "reminders", "night", "calendar") or style not in STYLES:
                     return self._send(404, b"not found", "text/plain")
                 now = datetime.now()
                 live, fake = dict(state.data), samples(now)
@@ -268,6 +269,29 @@ def make_handler(state: "State"):
                     return self._json({"error": f"AdGuard didn't take it: {e}"}, 502)
                 state.refresh_soon(stats_too=True)
                 return self._json({"ok": True})
+
+            if path == "/api/calendar":
+                url = clean_url(body.get("url") or "")[:2000]
+                if url and not url.startswith("https://"):
+                    return self._json({"error": "Paste the whole link, starting https://"}, 400)
+                if body.get("heads_up") in (0, 5, 10, 15, 30, 60):
+                    cfg.calendar_heads_up = body["heads_up"]
+                a = CalendarSource(url).get() if url else None
+                if body.get("save"):
+                    cfg.calendar_url = url
+                    cfg.save()
+                    state.refresh_soon(stats_too=True)
+                if a is None:
+                    return self._json({"ok": bool(body.get("save")), "message": "Calendar turned off." if body.get("save") else "Paste your link first."})
+                if not a.online:
+                    why = {"NOT A CALENDAR LINK": "That link didn't return a calendar. Use the link from Share with anyone."}
+                    return self._json({"ok": False, "message": why.get(a.note, "Couldn't fetch that link. Check it's copied in full.")})
+                if not a.events:
+                    return self._json({"ok": True, "message": "Connected. Nothing on for the next two weeks."})
+                e = a.events[0]
+                when = e.start.strftime("%a %-d %b") + ("" if e.all_day else e.start.strftime(", %H:%M"))
+                busy = " (titles hidden: pick Full view when you make the link)" if all(x.title == "Busy" for x in a.events) else ""
+                return self._json({"ok": True, "message": f"Connected. {len(a.events)} events in the next two weeks. Next: {e.title}, {when}.{busy}"})
 
             if path == "/api/muncher":
                 if "party" in body:

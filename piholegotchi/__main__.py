@@ -20,6 +20,7 @@ from PIL import Image
 
 from . import schedule
 from .adguard import AdGuard
+from .calendar_feed import CalendarSource
 from .config import Config
 from .moods import Moods
 from .render import Stats, mood, muncher, setup_screen, sleeve
@@ -36,6 +37,7 @@ PAUSE_GRACE = 120         # keep showing a paused track this long before switchi
 FULL_EVERY = 30           # force a full refresh after this many partials (clears ghosting)
 WEATHER_EVERY = 1200      # seconds between forecast updates
 SERVER_EVERY = 60         # seconds between server checks
+CALENDAR_EVERY = 900      # seconds between calendar checks
 NUDGE_SHOW = 60           # while music plays, a nudge cuts in for this long...
 NUDGE_GAP = 600           # ...at most this often
 
@@ -109,7 +111,9 @@ class Sources:
         self.weather = old.weather if same("weather_lat", "weather_lon", "weather_place") else \
             WeatherSource(cfg.weather_lat, cfg.weather_lon, cfg.weather_name or cfg.weather_place)
         self.server = old.server if same("server_url") else Glances(cfg.server_url)
+        self.calendar = old.calendar if same("calendar_url") else CalendarSource(cfg.calendar_url)
         self.changed = {
+            "calendar": not same("calendar_url"),
             "adguard": not same("adguard_url", "adguard_username", "adguard_password"),
             "weather": not same("weather_lat", "weather_lon", "weather_place"),
             "server": not same("server_url"),
@@ -124,7 +128,7 @@ def plan(cfg: Config, playing: bool, nudges: list[str], ambient: list[str], now:
     st["was_playing"] = playing
     if playing:
         if cfg.music_mode == "rotate":
-            return st["rot"].pick(["sleeve"] + ambient + nudges, now, dwell)
+            return st["rot"].pick(list(dict.fromkeys(["sleeve"] + ambient + nudges)), now, dwell)
         if cfg.music_mode == "nudges" and nudges:
             if now < st["nudge_until"]:
                 return st["nudge"] if st["nudge"] in nudges else nudges[0]
@@ -134,7 +138,7 @@ def plan(cfg: Config, playing: bool, nudges: list[str], ambient: list[str], now:
                 st["nudge_until"], st["next_nudge"] = now + NUDGE_SHOW, now + NUDGE_GAP
                 return st["nudge"]
         return "sleeve"
-    pool = ambient + nudges
+    pool = list(dict.fromkeys(ambient + nudges))
     return st["rot"].pick(pool, now, dwell) if pool else "muncher"
 
 
@@ -176,6 +180,7 @@ def main():
     moods = state.moods
     weather, next_weather = None, 0.0
     server, next_server = None, 0.0
+    agenda, next_cal = None, 0.0
     track, paused_since = None, None
     last_key, last_bytes, partials = None, None, 0
     night = None                              # ((style, until), image) while night mode is on
@@ -194,9 +199,11 @@ def main():
                 weather, next_weather = None, 0
             if src.changed["server"]:
                 server, next_server = None, 0
+            if src.changed["calendar"]:
+                agenda, next_cal = None, 0
 
         if state.stats_stale:
-            state.stats_stale, next_stats, next_weather, next_server = False, 0, 0, 0
+            state.stats_stale, next_stats, next_weather, next_server, next_cal = False, 0, 0, 0, 0
         if now >= next_stats:
             raw = src.adguard.stats() if cfg.adguard_url else Stats(0, 0, 0.0, online=False, note="SET UP ADGUARD")
             next_stats = now + STATS_EVERY
@@ -208,6 +215,9 @@ def main():
             weather, next_weather = src.weather.get(), now + WEATHER_EVERY
         if on.get("server") and src.server.configured and now >= next_server:
             server, next_server = src.server.get(), now + SERVER_EVERY
+        if on.get("calendar") and src.calendar.configured and now >= next_cal:
+            agenda, next_cal = src.calendar.get(), now + CALENDAR_EVERY
+        events = [e for e in agenda.events if e.end > clock] if agenda else None
 
         t = src.spotify.now_playing()
         if t and t.is_playing:
@@ -220,18 +230,23 @@ def main():
 
         bins = schedule.bin_day(cfg.bins, clock) if on.get("bins") else None
         rems = schedule.reminders(cfg.reminders, clock)
-        data = {"server": server, "weather": weather, "bins": bins, "reminders": rems}
+        data = {"server": server, "weather": weather, "bins": bins, "reminders": rems, "calendar": events}
+        heads_up = cfg.calendar_heads_up * 60
+        soon = bool(events and heads_up and not events[0].all_day
+                    and 0 <= (events[0].start - clock).total_seconds() <= heads_up)
 
         ambient = [n for n, ok in (
             ("muncher", on.get("muncher") and bool(cfg.adguard_url)),
             ("weather", on.get("weather") and src.weather.configured),
-            ("server", on.get("server") and src.server.configured)) if ok]
+            ("server", on.get("server") and src.server.configured),
+            ("calendar", on.get("calendar") and src.calendar.configured)) if ok]
         nudges = [n for n, ok in (
             ("bins", bins is not None),
-            ("reminders", on.get("reminders") and any(r.due for r in rems))) if ok]
+            ("reminders", on.get("reminders") and any(r.due for r in rems)),
+            ("calendar", on.get("calendar") and soon)) if ok]
 
         anything = (cfg.adguard_url or src.spotify.configured or src.weather.configured
-                    or src.server.configured or cfg.bins or cfg.reminders)
+                    or src.server.configured or src.calendar.configured or cfg.bins or cfg.reminders)
         if not anything:
             ip = local_ip()
             img, key = setup_screen(socket.gethostname(), ip), ("setup", ip)
@@ -251,6 +266,8 @@ def main():
             if name != "sleeve" and on.get("muncher") and (mood(stats) in ("party", "starving")
                                                          or stats.note == "BLOCKING PAUSED"):
                 name = "muncher"                  # a record or a hungry Muncher takes over the screen
+            if name != "sleeve" and "calendar" in nudges:
+                name = "calendar"                 # something's about to start
             style = cfg.styles.get(name, "A")
             if name == "sleeve" and track:
                 img, key = sleeve(track), ("sleeve", track.id)
@@ -302,6 +319,7 @@ DETAILS = {
     "weather": lambda d: (f"{d['weather'].desc}, {round(d['weather'].temp)}°" if d.get("weather") else "No weather yet"),
     "server": lambda d: (f"Disk {d['server'].disk:.0f}% full" if d.get("server") and d["server"].online
                          else "Can't reach the server"),
+    "calendar": lambda d: (f"Next: {d['calendar'][0].title}" if d.get("calendar") else "Nothing on the calendar"),
     "bins": lambda d: "Bin day: " + ", ".join(b.name for b in d["bins"].bins if b.on),
     "reminders": lambda d: next((r.title for r in d["reminders"] if r.due), "Nothing due"),
 }

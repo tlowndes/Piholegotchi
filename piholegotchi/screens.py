@@ -723,7 +723,161 @@ def render_night(style: str, blocked: int | None, until: str) -> Image.Image:
     return night_c(until) if style == "C" else night_a(blocked, until)
 
 
+# ================================================================ calendar
+
+def _cal_day(e, now: datetime) -> str:
+    d = (e.start.date() - now.date()).days
+    if e.start <= now:
+        return "NOW"
+    if d == 0:
+        return "TODAY"
+    if d == 1:
+        return "TOMORROW"
+    return e.start.strftime("%a %-d %b").upper()
+
+
+def _cal_in(e, now: datetime) -> str:
+    """'IN 25 MIN', 'IN 2H 10M', 'ENDS 16:00', or '' when it's not today."""
+    if e.start <= now:
+        return "ALL DAY" if e.all_day else f"ENDS {e.end:%H:%M}"
+    mins = math.ceil((e.start - now).total_seconds() / 60)
+    if e.all_day or mins >= 12 * 60:
+        return ""
+    return f"IN {mins} MIN" if mins < 60 else f"IN {mins // 60}H {mins % 60:02d}M"
+
+
+def _cal_time(e) -> str:
+    if e.all_day:
+        days = (e.end.date() - e.start.date()).days
+        return "All day" if days <= 1 else f"{days} days"
+    return f"{e.start:%H:%M}–{e.end:%H:%M}"
+
+
+def _page(c: Canvas, x, y, now_or_day: datetime, w=58):
+    """A tear-off calendar page with the day number."""
+    d = c.d
+    d.rounded_rectangle([x, y, x + w, y + w + 8], 5, outline=INK, width=2)
+    d.rounded_rectangle([x, y, x + w, y + 18], 5, fill=INK)
+    c.rect(x, y + 12, w + 1, 7)
+    for rx in (x + 14, x + w - 14):
+        c.rect(rx - 2, y - 5, 4, 9)
+    c.text((x + w / 2 + 1, y + 14), now_or_day.strftime("%b").upper(), pix(), anchor="ms", fill=PAPER)
+    c.text((x + w / 2 + 1, y + w + 1), str(now_or_day.day), grot(34), anchor="ms")
+
+
+def _no_cal(why: str) -> Image.Image:
+    c = Canvas()
+    from datetime import datetime as _dt
+    _page(c, 22, 26, _dt.now())
+    x = 112
+    c.text((x, 24), "CALENDAR", pix())
+    c.text((x - 1, 52), "Nothing on", grot(22))
+    c.text((x, 70), "for two weeks.", vt(20))
+    c.rect(x, 82, 130, 1)
+    c.text((x, 96), fit(why, 130, pix()), pix())
+    return c.finish()
+
+
+def calendar_a(events: list, now: datetime) -> Image.Image:
+    """Up next: a tear-off page beside the next event."""
+    if not events:
+        return _no_cal("ENJOY THE QUIET")
+    e = events[0]
+    c = Canvas()
+    _page(c, 22, 26, e.start if e.start > now else now)
+    x = 112
+    head = _cal_day(e, now)
+    soon = _cal_in(e, now)
+    c.text((x, 20), fit(head + (" · " + soon if soon else ""), 130, pix()), pix())
+    lines = _wrap2(e.title, 130, grot(17))
+    for i, ln in enumerate(lines):
+        c.text((x - 1, 40 + i * 17), ln, grot(17))
+    y = 40 + len(lines) * 17 + 2
+    c.text((x, y), fit(_cal_time(e) + (f"  {e.where}" if e.where else ""), 130, vt(18)), vt(18))
+    c.rect(x, 88, 130, 1)
+    if len(events) > 1:
+        n = events[1]
+        when = n.start.strftime("%H:%M") if n.start.date() == e.start.date() and not n.all_day else _cal_day(n, now)
+        c.text((x, 101), fit(f"THEN {when}", 130, pix()), pix())
+        c.text((x, 115), fit(n.title, 130, vt(16)), vt(16))
+    else:
+        c.text((x, 103), "NOTHING AFTER", pix())
+    return c.finish()
+
+
+def calendar_b(events: list, now: datetime) -> Image.Image:
+    """Agenda: the next three, like a diary page."""
+    c = Canvas()
+    t, _, short = now_str(now)
+    c.text((8, 18), short, pix())
+    c.text((242, 18), "UP NEXT", pix(), anchor="rs")
+    c.rect(8, 24, 234, 2)
+    if not events:
+        c.text((125, 70), "Nothing on.", grot(20), anchor="ms")
+        c.text((125, 92), "FOR THE NEXT TWO WEEKS", pix(), anchor="ms")
+        return c.finish()
+    for i, e in enumerate(events[:3]):
+        y = 30 + i * 31
+        if i:
+            for xx in range(8, 242, 3):
+                c.d.point((xx, y - 2), fill=INK)
+        first = i == 0
+        day = _cal_day(e, now)
+        tm = "ALL DAY" if e.all_day else ("NOW" if e.start <= now else e.start.strftime("%H:%M"))
+        if first:
+            c.rect(8, y + 1, 52, 26)
+            c.text((34, y + 12), day if day in ("NOW", "TODAY") else day[:10], pix(), anchor="ms", fill=PAPER)
+            c.text((34, y + 24), tm, pix(), anchor="ms", fill=PAPER)
+        else:
+            c.text((34, y + 12), day if len(day) <= 10 else e.start.strftime("%a %-d").upper(), pix(), anchor="ms")
+            c.text((34, y + 24), tm, pix(), anchor="ms")
+        c.text((68, y + 19), fit(e.title, 174, grot(15 if first else 14, "Bold" if first else "Medium")),
+               grot(15 if first else 14, "Bold" if first else "Medium"))
+    return c.finish()
+
+
+def calendar_c(events: list, now: datetime) -> Image.Image:
+    """Countdown: how long until the next thing, in big type."""
+    if not events:
+        return _no_cal("ENJOY THE QUIET")
+    e = events[0]
+    c = Canvas()
+    if e.start <= now:
+        big, small = "Now", ("ON ALL DAY" if e.all_day else f"UNTIL {e.end:%H:%M}")
+    else:
+        mins = math.ceil((e.start - now).total_seconds() / 60)
+        if e.all_day or mins >= 24 * 60:
+            big = _cal_day(e, now).title() if (e.start.date() - now.date()).days == 1 else e.start.strftime("%a")
+            small = "ALL DAY" if e.all_day else f"AT {e.start:%H:%M}"
+        elif mins >= 60:
+            big, small = f"{mins // 60}h {mins % 60:02d}m", f"AT {e.start:%H:%M}"
+        else:
+            big, small = f"{mins} min", f"AT {e.start:%H:%M}"
+    c.text((8, 18), "NEXT UP IN" if e.start > now else "HAPPENING", pix())
+    txt, f = fit_size(big, 234, (52, 46, 40), grot)
+    c.text((5, 64), txt, f)
+    c.rect(8, 76, 234, 2)
+    c.text((8, 96), fit(e.title, 234, grot(17)), grot(17))
+    c.text((8, 112), fit(small + (f" · {e.where.upper()}" if e.where else ""), 234, pix()), pix())
+    return c.finish()
+
+
+def render_calendar(style: str, events: list, now: datetime) -> Image.Image:
+    return {"B": calendar_b, "C": calendar_c}.get(style, calendar_a)(events, now)
+
+
 # ================================================================ samples (for the picker before things are set up)
+
+def _sample_events(now: datetime) -> list:
+    from datetime import timedelta
+    from .calendar_feed import Event
+    base = now.replace(second=0, microsecond=0)
+    t = base + timedelta(minutes=25)
+    tom = datetime.combine(now.date() + timedelta(days=1), datetime.min.time())
+    return [Event("Portfolio review with Sam", t, t + timedelta(hours=1), False, "Zoom"),
+            Event("Climbing", base.replace(hour=19, minute=30), base.replace(hour=21, minute=0), False, ""),
+            Event("Mum's birthday", tom, tom + timedelta(days=1), True, "")]
+
 
 def samples(now: datetime) -> dict:
     from datetime import timedelta
@@ -737,6 +891,7 @@ def samples(now: datetime) -> dict:
                        [Bin("Black", "Waste", True), Bin("Green", "Garden", False), Bin("Blue", "Recycle", True)],
                        "NEXT: GREEN, " + (now.date() + timedelta(days=8)).strftime("%a %-d").upper()),
         "night": {"blocked": 4812, "until": "07:00"},
+        "calendar": _sample_events(now),
         "reminders": [Reminder("Water the monstera", "plant", True, "NOW", 1, 8, 7),
                       Reminder("Feed Biscuit", "pet", False, "18:00", every=1, at="18:00", since_days=0),
                       Reminder("Mist the ferns", "plant", False, "FRI", every=3, since_days=1),
@@ -755,6 +910,9 @@ def draw(name: str, style: str, data: dict, now: datetime) -> Image.Image:
         return render_bins(style, b) if b else render_bins(style, samples(now)["bins"])
     if name == "reminders":
         return render_reminders(style, data.get("reminders") or [], now)
+    if name == "calendar":
+        cal = data.get("calendar")
+        return render_calendar(style, cal if cal is not None else [], now)
     if name == "night":
         n = data.get("night") or {}
         return render_night(style, n.get("blocked"), n.get("until", "07:00"))

@@ -193,7 +193,7 @@ button.x{padding:8px 10px;color:var(--muted)}
 
   <section aria-labelledby="sc-h">
     <div class="sechead"><h2 id="sc-h">Screens</h2></div>
-    <p class="lead">When nothing's playing, these take turns. Bins and reminders only join in when something's due. Tap a style to pick it.</p>
+    <p class="lead">When nothing's playing, these take turns. Bins and reminders only join in when something’s due, and Calendar takes over just before an event. Tap a style to pick it.</p>
     <div class="picker" id="picker"></div>
     <div class="grid2">
       <div class="field"><label for="rotate">Change screen every</label>
@@ -271,6 +271,26 @@ button.x{padding:8px 10px;color:var(--muted)}
     <p class="msg" id="sv-msg" role="status"></p>
   </section>
 
+  <section aria-labelledby="cl-h">
+    <div class="sechead"><h2 id="cl-h">Calendar</h2><span id="cl-pill" class="pill off">Not set up</span></div>
+    <ol class="steps">
+      <li><div><p>In Proton Calendar on the web, go to <b>Settings</b>, <b>All settings</b>, <b>Calendars</b> and pick your calendar.</p></div></li>
+      <li><div><p>Under <b>Share with anyone</b>, choose <b>Create link</b>, pick <b>Full view</b> so event names show, and copy the link.</p></div></li>
+      <li><div class="field">
+        <label for="cl-url">Your calendar link</label>
+        <input id="cl-url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://calendar.proton.me/api/calendar/v1/url/…">
+        <span class="hint">Any calendar's ICS link works too. Anyone with the link can see your events, so keep it to yourself.</span>
+      </div></li>
+    </ol>
+    <div class="grid2">
+      <div class="field"><label for="cl-heads">Heads-up before an event</label>
+        <select id="cl-heads"><option value="0">None</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option></select>
+        <span class="hint">Calendar takes over the screen until it starts. While music plays it cuts in like bins and reminders.</span></div>
+    </div>
+    <div class="row"><button class="primary" id="cl-save" type="button">Save</button><button id="cl-test" type="button">Test link</button></div>
+    <p class="msg" id="cl-msg" role="status"></p>
+  </section>
+
   <section aria-labelledby="bn-h">
     <div class="sechead"><h2 id="bn-h">Bin day</h2><span id="bn-pill" class="pill off">No bins</span></div>
     <p class="lead">Shows from 4pm the day before until 10am on the day.</p>
@@ -337,6 +357,7 @@ async function poll(){
     $('ver').textContent = s.version ? 'Version ' + s.version : 'Version unknown';
     if (s.update && s.update.message){ say($('up-msg'), s.update.message, !/failed/i.test(s.update.message)); }
     $('wx-pill').textContent = cfg.weather_name ? cfg.weather_name : 'Not set up'; $('wx-pill').className = 'pill ' + (cfg.weather_name ? 'on' : 'off');
+    $('cl-pill').textContent = cfg.calendar_url ? 'Set up' : 'Not set up'; $('cl-pill').className = 'pill ' + (cfg.calendar_url ? 'on' : 'off');
     $('sv-pill').textContent = cfg.server_url ? 'Set up' : 'Not set up'; $('sv-pill').className = 'pill ' + (cfg.server_url ? 'on' : 'off');
     $('bn-pill').textContent = cfg.bins.length ? (s.bins_next ? s.bins_next.replace('NEXT: ', '') : cfg.bins.length + ' bins') : 'No bins';
     $('bn-pill').className = 'pill ' + (cfg.bins.length ? 'on' : 'off');
@@ -353,6 +374,7 @@ async function poll(){
       (document.getElementById('mm-' + (cfg.music_mode || 'nudges')) || {}).checked = true;
       $('wx-place').value = cfg.weather_name || cfg.weather_place || '';
       $('sv-url').value = cfg.server_url || '';
+      $('cl-url').value = cfg.calendar_url || ''; $('cl-heads').value = String(cfg.calendar_heads_up);
       cfg.bins.forEach(addBin);
       cfg.reminders.forEach(addRem); paintRemStatus();
       $('flip').checked = !!cfg.flip;
@@ -412,6 +434,7 @@ const SCREENS = [
   {id:'muncher', name:'Muncher', hint:'Ad-blocking stats from AdGuard.'},
   {id:'weather', name:'Weather and clock', styles:['Big clock','Forecast strip','Window']},
   {id:'server', name:'Server health', styles:['Box face','Gauges','Panic mode']},
+  {id:'calendar', name:'Calendar', styles:['Up next','Agenda','Countdown']},
   {id:'bins', name:'Bin day', styles:['Bin buddy','Calendar','Loud']},
   {id:'reminders', name:'Plants and pets', styles:['Thirsty plant','Checklist','Sticky note']},
 ];
@@ -533,6 +556,16 @@ async function server(save){
 }
 $('sv-save').addEventListener('click', () => server(true));
 $('sv-test').addEventListener('click', () => server(false));
+
+/* Calendar */
+async function calendar(save){
+  say($('cl-msg'), save ? 'Saving…' : 'Testing…', true);
+  try{ const r = await api('/api/calendar', {url: $('cl-url').value, heads_up: Number($('cl-heads').value), save}); say($('cl-msg'), (save && r.ok ? 'Saved. ' : '') + r.message, r.ok); if (save) setTimeout(() => { poll(); refreshThumbs(); }, 3000); }
+  catch(e){ say($('cl-msg'), e.message); }
+}
+$('cl-save').addEventListener('click', () => calendar(true));
+$('cl-test').addEventListener('click', () => calendar(false));
+$('cl-heads').addEventListener('change', () => calendar(true));
 
 /* Bins */
 let rowN = 0;
