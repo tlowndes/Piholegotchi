@@ -11,8 +11,8 @@ CONFIG_DIR = Path(os.environ.get("PIHOLEGOTCHI_HOME", Path.home() / ".config" / 
 CONFIG_FILE = CONFIG_DIR / "config.json"
 _lock = threading.Lock()
 
-DEFAULT_SCREENS = {"muncher": True, "weather": True, "server": True, "bins": True, "reminders": True}
-DEFAULT_STYLES = {"server": "A", "weather": "A", "bins": "A", "reminders": "A"}
+DEFAULT_SCREENS = {"muncher": True, "weather": True, "server": True, "calendar": True, "bins": True, "reminders": True}
+DEFAULT_STYLES = {"server": "A", "weather": "A", "bins": "A", "reminders": "A", "night": "A", "calendar": "A"}
 
 
 @dataclass
@@ -29,12 +29,27 @@ class Config:
     music_mode: str = "nudges"  # while Spotify plays: "sleeve", "nudges" or "rotate"
     rotate_minutes: int = 2     # how long each screen stays up before the next
 
+    pause_minutes: int = 5      # the settings page's "Pause ads" button
+
+    # Muncher moods
+    muncher_party: bool = True  # dance when today beats the best day so far
+    starve_minutes: int = 30    # starving face once blocking's been off this long (0 = never)
+
+    # night mode: one quiet screen, no refreshes, panel asleep
+    night: bool = True
+    night_from: str = "23:00"
+    night_to: str = "07:00"
+    night_music: bool = True    # wake up for Sleeve if music plays at night
+
     weather_place: str = ""     # what was typed, e.g. "Bristol"
     weather_name: str = ""      # what it matched, e.g. "Bristol, England"
     weather_lat: float = 0.0
     weather_lon: float = 0.0
 
     server_url: str = ""        # Glances on the server, e.g. http://192.168.1.20:61208
+
+    calendar_url: str = ""      # a shared ICS link, e.g. Proton Calendar's "Share with anyone"
+    calendar_heads_up: int = 15 # cut in this many minutes before an event (0 = never)
 
     # [{"name": "Black", "label": "Waste", "weekday": 3, "every": 1, "from": "2026-11-12"}]
     bins: list = field(default_factory=list)

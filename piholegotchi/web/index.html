@@ -130,6 +130,17 @@ button.x{padding:8px 10px;color:var(--muted)}
     <button class="quiet" id="refresh" type="button">Refresh screen</button>
   </div>
 
+  <section aria-labelledby="pz-h" id="pz" hidden>
+    <div class="sechead"><h2 id="pz-h">Ad blocking</h2><span id="pz-pill" class="pill on">On</span></div>
+    <p class="lead" id="pz-text">Need to get past a blocked link? Pause it for a bit. It comes back on by itself.</p>
+    <div class="row">
+      <button class="primary" type="button" id="pz-go">Pause ads for 5 minutes</button>
+      <select id="pz-mins" aria-label="How long to pause for"><option value="1">1 min</option><option value="5">5 min</option><option value="10">10 min</option><option value="30">30 min</option><option value="60">1 hour</option></select>
+      <button type="button" id="pz-stop" hidden>Turn blocking back on</button>
+    </div>
+    <p class="msg" id="pz-msg" role="status"></p>
+  </section>
+
   <section aria-labelledby="sp-h">
     <div class="sechead"><h2 id="sp-h">Spotify</h2><span id="sp-pill" class="pill off">Not connected</span></div>
 
@@ -182,7 +193,7 @@ button.x{padding:8px 10px;color:var(--muted)}
 
   <section aria-labelledby="sc-h">
     <div class="sechead"><h2 id="sc-h">Screens</h2></div>
-    <p class="lead">When nothing's playing, these take turns. Bins and reminders only join in when something's due. Tap a style to pick it.</p>
+    <p class="lead">When nothing's playing, these take turns. Bins and reminders only join in when something’s due, and Calendar takes over just before an event. Tap a style to pick it.</p>
     <div class="picker" id="picker"></div>
     <div class="grid2">
       <div class="field"><label for="rotate">Change screen every</label>
@@ -200,6 +211,39 @@ button.x{padding:8px 10px;color:var(--muted)}
       <span><b>Flip upside down</b><br><span class="hint">For when the Pi is mounted with the cable on top.</span></span>
     </label>
     <p class="msg" id="sc-msg" role="status"></p>
+  </section>
+
+  <section aria-labelledby="mm-h">
+    <div class="sechead"><h2 id="mm-h">Muncher moods</h2></div>
+    <label class="switch" for="mu-party">
+      <input type="checkbox" id="mu-party" role="switch">
+      <span><b>Dance on record days</b><br><span class="hint">When today's blocking beats the best day so far, the Muncher dances for an hour.</span></span>
+    </label>
+    <div class="grid2">
+      <div class="field"><label for="mu-starve">Starving face when blocking's been off for</label>
+        <select id="mu-starve"><option value="10">10 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option><option value="120">2 hours</option><option value="0">Never</option></select></div>
+    </div>
+    <div class="row"><button type="button" id="mu-show">Show me the dance</button></div>
+    <p class="msg" id="mu-msg" role="status"></p>
+  </section>
+
+  <section aria-labelledby="nt-h">
+    <div class="sechead"><h2 id="nt-h">Night mode</h2><span id="nt-pill" class="pill off">Off</span></div>
+    <p class="lead">One quiet screen overnight. The e-ink is left alone and powered down until morning.</p>
+    <label class="switch" for="nt-on">
+      <input type="checkbox" id="nt-on" role="switch">
+      <span><b>Sleep at night</b></span>
+    </label>
+    <div class="grid2">
+      <div class="field"><label for="nt-from">From</label><input type="time" id="nt-from" step="300" value="23:00"></div>
+      <div class="field"><label for="nt-to">Until</label><input type="time" id="nt-to" step="300" value="07:00"></div>
+    </div>
+    <div class="styles" role="radiogroup" aria-label="Night mode style" id="nt-styles"></div>
+    <label class="switch" for="nt-music">
+      <input type="checkbox" id="nt-music" role="switch">
+      <span><b>Wake up for music</b><br><span class="hint">Shows Sleeve if Spotify plays at night, then goes back to sleep.</span></span>
+    </label>
+    <p class="msg" id="nt-msg" role="status"></p>
   </section>
 
   <section aria-labelledby="wx-h">
@@ -225,6 +269,26 @@ button.x{padding:8px 10px;color:var(--muted)}
       </div></li>
     </ol>
     <p class="msg" id="sv-msg" role="status"></p>
+  </section>
+
+  <section aria-labelledby="cl-h">
+    <div class="sechead"><h2 id="cl-h">Calendar</h2><span id="cl-pill" class="pill off">Not set up</span></div>
+    <ol class="steps">
+      <li><div><p>In Proton Calendar on the web, go to <b>Settings</b>, <b>All settings</b>, <b>Calendars</b> and pick your calendar.</p></div></li>
+      <li><div><p>Under <b>Share with anyone</b>, choose <b>Create link</b>, pick <b>Full view</b> so event names show, and copy the link.</p></div></li>
+      <li><div class="field">
+        <label for="cl-url">Your calendar link</label>
+        <input id="cl-url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://calendar.proton.me/api/calendar/v1/url/…">
+        <span class="hint">Any calendar's ICS link works too. Anyone with the link can see your events, so keep it to yourself.</span>
+      </div></li>
+    </ol>
+    <div class="grid2">
+      <div class="field"><label for="cl-heads">Heads-up before an event</label>
+        <select id="cl-heads"><option value="0">None</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option></select>
+        <span class="hint">Calendar takes over the screen until it starts. While music plays it cuts in like bins and reminders.</span></div>
+    </div>
+    <div class="row"><button class="primary" id="cl-save" type="button">Save</button><button id="cl-test" type="button">Test link</button></div>
+    <p class="msg" id="cl-msg" role="status"></p>
   </section>
 
   <section aria-labelledby="bn-h">
@@ -289,9 +353,11 @@ async function poll(){
     const ag = cfg.adguard_url ? (st && st.online ? 'Connected' : (st && st.note === 'BLOCKING IS OFF' ? 'Blocking off' : 'Can’t reach')) : 'Not set up';
     $('ag-pill').textContent = ag; $('ag-pill').className = 'pill ' + (ag === 'Connected' ? 'on' : 'off');
     pwSet = cfg.adguard_password_set;
+    paintPause(cfg, st, s.now);
     $('ver').textContent = s.version ? 'Version ' + s.version : 'Version unknown';
     if (s.update && s.update.message){ say($('up-msg'), s.update.message, !/failed/i.test(s.update.message)); }
     $('wx-pill').textContent = cfg.weather_name ? cfg.weather_name : 'Not set up'; $('wx-pill').className = 'pill ' + (cfg.weather_name ? 'on' : 'off');
+    $('cl-pill').textContent = cfg.calendar_url ? 'Set up' : 'Not set up'; $('cl-pill').className = 'pill ' + (cfg.calendar_url ? 'on' : 'off');
     $('sv-pill').textContent = cfg.server_url ? 'Set up' : 'Not set up'; $('sv-pill').className = 'pill ' + (cfg.server_url ? 'on' : 'off');
     $('bn-pill').textContent = cfg.bins.length ? (s.bins_next ? s.bins_next.replace('NEXT: ', '') : cfg.bins.length + ' bins') : 'No bins';
     $('bn-pill').className = 'pill ' + (cfg.bins.length ? 'on' : 'off');
@@ -299,6 +365,8 @@ async function poll(){
     $('rm-pill').textContent = cfg.reminders.length ? (dueN ? dueN + ' due' : 'All done') : 'None yet';
     $('rm-pill').className = 'pill ' + (cfg.reminders.length ? 'on' : 'off');
     remState = s.reminders || {}; paintRemStatus();
+    $('nt-pill').textContent = cfg.night ? cfg.night_from + '–' + cfg.night_to : 'Off';
+    $('nt-pill').className = 'pill ' + (cfg.night ? 'on' : 'off');
     if (!loaded){
       loaded = true;
       buildPicker(cfg);
@@ -306,9 +374,13 @@ async function poll(){
       (document.getElementById('mm-' + (cfg.music_mode || 'nudges')) || {}).checked = true;
       $('wx-place').value = cfg.weather_name || cfg.weather_place || '';
       $('sv-url').value = cfg.server_url || '';
+      $('cl-url').value = cfg.calendar_url || ''; $('cl-heads').value = String(cfg.calendar_heads_up);
       cfg.bins.forEach(addBin);
       cfg.reminders.forEach(addRem); paintRemStatus();
       $('flip').checked = !!cfg.flip;
+      buildNight(cfg);
+      $('pz-mins').value = String(cfg.pause_minutes || 5); pzLabel();
+      $('mu-party').checked = !!cfg.muncher_party; $('mu-starve').value = String(cfg.starve_minutes);
       $('sp-client').value = cfg.spotify_client_id || '';
       $('ag-url').value = cfg.adguard_url || '';
       $('ag-user').value = cfg.adguard_username || '';
@@ -362,6 +434,7 @@ const SCREENS = [
   {id:'muncher', name:'Muncher', hint:'Ad-blocking stats from AdGuard.'},
   {id:'weather', name:'Weather and clock', styles:['Big clock','Forecast strip','Window']},
   {id:'server', name:'Server health', styles:['Box face','Gauges','Panic mode']},
+  {id:'calendar', name:'Calendar', styles:['Up next','Agenda','Countdown']},
   {id:'bins', name:'Bin day', styles:['Bin buddy','Calendar','Loud']},
   {id:'reminders', name:'Plants and pets', styles:['Thirsty plant','Checklist','Sticky note']},
 ];
@@ -400,6 +473,74 @@ async function saveRotation(change){
 $('rotate').addEventListener('change', () => saveRotation({rotate_minutes: Number($('rotate').value)}));
 document.querySelectorAll('input[name=music]').forEach(r => r.addEventListener('change', () => saveRotation({music_mode: r.value})));
 
+/* Pause blocking */
+function pzLabel(){ const m = Number($('pz-mins').value); $('pz-go').textContent = 'Pause ads for ' + (m === 60 ? '1 hour' : m + (m === 1 ? ' minute' : ' minutes')); }
+function paintPause(cfg, st, now){
+  $('pz').hidden = !cfg.adguard_url;
+  const paused = st && st.note === 'BLOCKING PAUSED', off = st && st.note === 'BLOCKING IS OFF';
+  const pill = paused ? 'Paused' : off ? 'Off' : (st && st.online ? 'On' : 'Can’t reach');
+  $('pz-pill').textContent = pill; $('pz-pill').className = 'pill ' + (pill === 'On' ? 'on' : 'off');
+  if (paused){
+    const left = Math.max(1, Math.ceil((st.paused_until - now) / 60));
+    $('pz-text').textContent = 'Paused. Ads get through for about ' + left + (left === 1 ? ' more minute.' : ' more minutes.');
+  } else if (off){
+    $('pz-text').textContent = 'Blocking is switched off in AdGuard.';
+  } else {
+    $('pz-text').textContent = 'Need to get past a blocked link? Pause it for a bit. It comes back on by itself.';
+  }
+  $('pz-go').hidden = $('pz-mins').hidden = paused || off; $('pz-stop').hidden = !(paused || off);
+}
+$('pz-mins').addEventListener('change', pzLabel);
+$('pz-go').addEventListener('click', async () => {
+  $('pz-go').disabled = true; say($('pz-msg'), 'Pausing…', true);
+  try{ await api('/api/pause', {minutes: Number($('pz-mins').value)}); say($('pz-msg'), ''); setTimeout(poll, 1500); }
+  catch(e){ say($('pz-msg'), e.message); }
+  $('pz-go').disabled = false;
+});
+$('pz-stop').addEventListener('click', async () => {
+  $('pz-stop').disabled = true;
+  try{ await api('/api/resume', {}); say($('pz-msg'), 'Blocking’s back on.', true); setTimeout(() => say($('pz-msg'), ''), 3000); setTimeout(poll, 1500); }
+  catch(e){ say($('pz-msg'), e.message); }
+  $('pz-stop').disabled = false;
+});
+
+/* Muncher moods */
+async function saveMuncher(){
+  try{ await api('/api/muncher', {party: $('mu-party').checked, starve: Number($('mu-starve').value)}); say($('mu-msg'), 'Saved.', true); setTimeout(() => say($('mu-msg'), ''), 2000); }
+  catch(e){ say($('mu-msg'), e.message); }
+}
+$('mu-party').addEventListener('change', saveMuncher);
+$('mu-starve').addEventListener('change', saveMuncher);
+$('mu-show').addEventListener('click', async () => {
+  try{ await api('/api/muncher/party', {}); say($('mu-msg'), 'Dancing for a minute. Watch the screen above.', true); setTimeout(poll, 2000); }
+  catch(e){ say($('mu-msg'), e.message); }
+});
+
+/* Night mode */
+function buildNight(cfg){
+  $('nt-on').checked = !!cfg.night; $('nt-music').checked = !!cfg.night_music;
+  $('nt-from').value = cfg.night_from; $('nt-to').value = cfg.night_to;
+  const box = $('nt-styles'); box.innerHTML = '';
+  ['Tucked in','Moon','Night sky'].forEach((n, i) => {
+    const k = 'ABC'[i], l = document.createElement('label');
+    l.innerHTML = `<input type="radio" name="st-night" id="st-night-${k}" value="${k}"><img data-src="/preview.png?screen=night&style=${k}" alt="${n}"><span>${k} · ${n.toUpperCase()}</span>`;
+    const r = l.querySelector('input'); r.checked = (cfg.styles.night || 'A') === k;
+    r.addEventListener('change', () => saveRotation({styles: {night: k}}));
+    box.append(l);
+  });
+  box.style.opacity = cfg.night ? '' : '.45';
+  refreshThumbs();
+}
+async function saveNight(){
+  const on = $('nt-on').checked;
+  $('nt-styles').style.opacity = on ? '' : '.45';
+  try{
+    await api('/api/night', {on, music: $('nt-music').checked, from: $('nt-from').value, to: $('nt-to').value});
+    say($('nt-msg'), 'Saved.', true); setTimeout(() => say($('nt-msg'), ''), 2000); setTimeout(poll, 2000);
+  }catch(e){ say($('nt-msg'), e.message); }
+}
+['nt-on','nt-music','nt-from','nt-to'].forEach(id => $(id).addEventListener('change', saveNight));
+
 /* Weather */
 $('wx-form').addEventListener('submit', async e => {
   e.preventDefault(); say($('wx-msg'), 'Looking it up…', true);
@@ -415,6 +556,16 @@ async function server(save){
 }
 $('sv-save').addEventListener('click', () => server(true));
 $('sv-test').addEventListener('click', () => server(false));
+
+/* Calendar */
+async function calendar(save){
+  say($('cl-msg'), save ? 'Saving…' : 'Testing…', true);
+  try{ const r = await api('/api/calendar', {url: $('cl-url').value, heads_up: Number($('cl-heads').value), save}); say($('cl-msg'), (save && r.ok ? 'Saved. ' : '') + r.message, r.ok); if (save) setTimeout(() => { poll(); refreshThumbs(); }, 3000); }
+  catch(e){ say($('cl-msg'), e.message); }
+}
+$('cl-save').addEventListener('click', () => calendar(true));
+$('cl-test').addEventListener('click', () => calendar(false));
+$('cl-heads').addEventListener('change', () => calendar(true));
 
 /* Bins */
 let rowN = 0;

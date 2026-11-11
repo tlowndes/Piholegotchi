@@ -56,13 +56,21 @@ def main():
         "muncher-content": muncher(Stats(15_210, 2_710, 17.8)),
         "muncher-hungry": muncher(Stats(9_880, 640, 6.5)),
         "muncher-asleep": muncher(Stats(0, 0, 0, online=False)),
+        "muncher-paused": muncher(Stats(0, 0, 0, online=False, note="BLOCKING PAUSED",
+                                        paused_until=datetime(2026, 11, 11, 17, 10).timestamp())),
+        "muncher-party": muncher(Stats(21_030, 5_380, 25.6, today=5_380, mood="party", beat=4_977)),
+        "muncher-party-2": muncher(Stats(21_030, 5_380, 25.6, today=5_380, mood="party", beat=4_977, frame=1)),
+        "muncher-starving": muncher(Stats(12_400, 3_100, 25.0, online=False, note="BLOCKING IS OFF",
+                                          mood="starving", off_mins=130)),
         "setup": setup_screen("piholegotchi", "192.168.1.42"),
     }
     now = datetime(2026, 11, 11, 17, 5)
     data = samples(now)
-    for screen in ("server", "weather", "bins", "reminders"):
+    for screen in ("server", "weather", "bins", "reminders", "calendar"):
         for st in STYLES:
             shots[f"{screen}-{st.lower()}"] = draw(screen, st, data, now)
+    for st in STYLES:
+        shots[f"night-{st.lower()}"] = draw("night", st, data, now)
     for name, img in shots.items():
         img.save(out / f"{name}-1bit.png")
         to_eink(img).save(out / f"{name}.png")

@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING
 from PIL import Image
 
 from . import schedule, spotify_auth, updater, weather
+from .calendar_feed import CalendarSource, clean_url
 from .adguard import AdGuard
 from .config import DEFAULT_SCREENS, Config
 from .screens import STYLES, draw, samples
@@ -129,13 +130,18 @@ def make_handler(state: "State"):
             if path == "/preview.png":
                 q = parse_qs(self.path.partition("?")[2])
                 name, style = q.get("screen", [""])[0], q.get("style", ["A"])[0]
-                if name not in ("server", "weather", "bins", "reminders") or style not in STYLES:
+                if name not in ("server", "weather", "bins", "reminders", "night", "calendar") or style not in STYLES:
                     return self._send(404, b"not found", "text/plain")
                 now = datetime.now()
                 live, fake = dict(state.data), samples(now)
                 use = {k: live.get(k) if live.get(k) is not None else fake[k] for k in fake}
                 if name == "reminders" and not Config.load().reminders:
                     use["reminders"] = fake["reminders"]
+                if name == "night":
+                    with state.lock:
+                        s = state.stats
+                    use["night"] = {"blocked": s.blocked if s and s.online else fake["night"]["blocked"],
+                                    "until": Config.load().night_to}
                 return self._send(200, _png(draw(name, style, use, now), 2), "image/png")
             if path == "/api/state":
                 cfg = Config.load()
@@ -150,7 +156,7 @@ def make_handler(state: "State"):
                         "now": time.time(),
                         "stats": None if s is None else {
                             "total": s.total, "blocked": s.blocked, "percent": round(s.percent, 1),
-                            "online": s.online, "note": s.note},
+                            "online": s.online, "note": s.note, "paused_until": s.paused_until},
                     }
                 out["config"] = cfg.public()
                 now = datetime.now()
@@ -241,6 +247,78 @@ def make_handler(state: "State"):
                     cfg.music_mode = body["music_mode"]
                 if body.get("rotate_minutes") in (1, 2, 5, 10, 30):
                     cfg.rotate_minutes = body["rotate_minutes"]
+                cfg.save()
+                state.refresh_soon()
+                return self._json({"ok": True})
+
+            if path in ("/api/pause", "/api/resume"):
+                if not cfg.adguard_url:
+                    return self._json({"error": "Set up AdGuard Home first."}, 400)
+                pausing = path == "/api/pause"
+                if pausing:
+                    mins = body.get("minutes")
+                    if mins not in (1, 5, 10, 30, 60):
+                        return self._json({"error": "Pick how long to pause for."}, 400)
+                    if mins != cfg.pause_minutes:
+                        cfg.pause_minutes = mins
+                        cfg.save()
+                try:
+                    AdGuard(cfg.adguard_url, cfg.adguard_username, cfg.adguard_password).protect(
+                        not pausing, cfg.pause_minutes if pausing else 0)
+                except Exception as e:  # noqa: BLE001
+                    return self._json({"error": f"AdGuard didn't take it: {e}"}, 502)
+                state.refresh_soon(stats_too=True)
+                return self._json({"ok": True})
+
+            if path == "/api/calendar":
+                url = clean_url(body.get("url") or "")[:2000]
+                if url and not url.startswith("https://"):
+                    return self._json({"error": "Paste the whole link, starting https://"}, 400)
+                if body.get("heads_up") in (0, 5, 10, 15, 30, 60):
+                    cfg.calendar_heads_up = body["heads_up"]
+                a = CalendarSource(url).get() if url else None
+                if body.get("save"):
+                    cfg.calendar_url = url
+                    cfg.save()
+                    state.refresh_soon(stats_too=True)
+                if a is None:
+                    return self._json({"ok": bool(body.get("save")), "message": "Calendar turned off." if body.get("save") else "Paste your link first."})
+                if not a.online:
+                    why = {"NOT A CALENDAR LINK": "That link didn't return a calendar. Use the link from Share with anyone."}
+                    return self._json({"ok": False, "message": why.get(a.note, "Couldn't fetch that link. Check it's copied in full.")})
+                if not a.events:
+                    return self._json({"ok": True, "message": "Connected. Nothing on for the next two weeks."})
+                e = a.events[0]
+                when = e.start.strftime("%a %-d %b") + ("" if e.all_day else e.start.strftime(", %H:%M"))
+                busy = " (titles hidden: pick Full view when you make the link)" if all(x.title == "Busy" for x in a.events) else ""
+                return self._json({"ok": True, "message": f"Connected. {len(a.events)} events in the next two weeks. Next: {e.title}, {when}.{busy}"})
+
+            if path == "/api/muncher":
+                if "party" in body:
+                    cfg.muncher_party = bool(body["party"])
+                if body.get("starve") in (0, 10, 30, 60, 120):
+                    cfg.starve_minutes = body["starve"]
+                cfg.save()
+                state.refresh_soon()
+                return self._json({"ok": True})
+
+            if path == "/api/muncher/party":
+                state.moods.party_now(cfg)
+                state.refresh_soon()
+                return self._json({"ok": True})
+
+            if path == "/api/night":
+                for k in ("from", "to"):
+                    if k in body and not TIME_RE.match(str(body[k])):
+                        return self._json({"error": "Use a 24-hour time like 23:00."}, 400)
+                if "on" in body:
+                    cfg.night = bool(body["on"])
+                if "music" in body:
+                    cfg.night_music = bool(body["music"])
+                cfg.night_from = body.get("from", cfg.night_from)
+                cfg.night_to = body.get("to", cfg.night_to)
+                if cfg.night_from == cfg.night_to:
+                    return self._json({"error": "Pick different start and end times."}, 400)
                 cfg.save()
                 state.refresh_soon()
                 return self._json({"ok": True})
