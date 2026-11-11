@@ -66,7 +66,8 @@ def main():
     }
     now = datetime(2026, 11, 11, 17, 5)
     data = samples(now)
-    for screen in ("server", "weather", "bins", "reminders", "calendar"):
+    data["repeat"].track_art = data["repeat"].artist_art = art
+    for screen in ("server", "weather", "bins", "reminders", "calendar", "snack", "repeat"):
         for st in STYLES:
             shots[f"{screen}-{st.lower()}"] = draw(screen, st, data, now)
     for st in STYLES:

@@ -54,6 +54,15 @@ class Weather:
 
 
 @dataclass
+class Top:
+    tracks: list                # [(title, artist)], most played first
+    artists: list               # [name]
+    track_art: Image.Image | None = None    # dithered, 106x106
+    artist_art: Image.Image | None = None
+    note: str = ""              # why it's empty
+
+
+@dataclass
 class Bin:
     name: str                   # "Black"
     label: str                  # "Waste"
@@ -866,6 +875,207 @@ def render_calendar(style: str, events: list, now: datetime) -> Image.Image:
     return {"B": calendar_b, "C": calendar_c}.get(style, calendar_a)(events, now)
 
 
+# ================================================================ biggest snack (top blocked domain)
+
+def _host(d: str) -> str:
+    return d[4:] if d.startswith("www.") else d
+
+
+def fit_left(s: str, width: int, font) -> str:
+    """Trim from the left, so the end of a domain (the bit that names it) stays."""
+    if font.getlength(s) <= width:
+        return s
+    while s and font.getlength("…" + s) > width:
+        s = s[1:]
+    return "…" + s
+
+
+def _domain(s: str, width: int, sizes=(19, 17, 15, 13)):
+    for z in sizes:
+        if grot(z).getlength(s) <= width:
+            return s, grot(z)
+    return fit_left(s, width, grot(sizes[-1])), grot(sizes[-1])
+
+
+def _plate(c: Canvas, cx, cy):
+    """A plate with an AD on it, knife and fork either side."""
+    d = c.d
+    d.ellipse([cx - 30, cy - 30, cx + 30, cy + 30], outline=INK, width=2)
+    d.ellipse([cx - 21, cy - 21, cx + 21, cy + 21], outline=INK, width=1)
+    c.box(cx - 13, cy - 9, 27, 19)
+    c.box(cx - 12, cy - 8, 25, 17)
+    c.text((cx + 1, cy + 4), "AD", pix(), anchor="ms")
+    fx, kx = cx - 42, cx + 42
+    c.rect(fx - 1, cy - 4, 3, 34)
+    for i in (-4, 0, 4):
+        c.rect(fx + i - 0, cy - 22, 1, 14)
+    c.rect(fx - 4, cy - 9, 9, 3)
+    d.polygon([(kx - 2, cy - 24), (kx + 3, cy - 20), (kx + 3, cy - 2), (kx - 2, cy - 2)], fill=INK)
+    c.rect(kx - 1, cy - 2, 3, 32)
+
+
+def _no_snack(why: str) -> Image.Image:
+    c = Canvas()
+    _plate(c, 56, 62)
+    x = 130
+    c.text((x, 24), "BIGGEST SNACK", pix())
+    c.text((x - 1, 52), "Empty plate", grot(19))
+    c.text((x, 70), "Nothing yet.", vt(20))
+    c.rect(x, 82, 112, 1)
+    c.text((x, 96), fit(why, 112, pix()), pix())
+    return c.finish()
+
+
+def snack_a(top: list) -> Image.Image:
+    """Plate: today's most-blocked domain, served up."""
+    if not top:
+        return _no_snack("CHECK ADGUARD")
+    c = Canvas()
+    _plate(c, 56, 62)
+    x = 120
+    name, n = top[0]
+    c.text((x, 22), "TODAY'S BIGGEST SNACK", pix())
+    txt, f = _domain(_host(name), 122)
+    c.text((x - 1, 48), txt, f)
+    c.text((x, 66), f"{n:,} bites.", vt(20))
+    c.rect(x, 80, 122, 1)
+    if len(top) > 1:
+        c.text((x, 94), "RUNNER-UP", pix())
+        c.text((x, 108), fit_left(_host(top[1][0]), 122, vt(16)), vt(16))
+    return c.finish()
+
+
+def snack_b(top: list) -> Image.Image:
+    """Menu: the top five, with dotted leaders like a café board."""
+    c = Canvas()
+    c.text((125, 18), "TODAY'S MENU", pix(), anchor="ms")
+    c.rect(60, 22, 130, 1)
+    if not top:
+        c.text((125, 70), "Nothing eaten yet.", vt(20), anchor="ms")
+        return c.finish()
+    for i, (name, n) in enumerate(top[:5]):
+        y = 40 + i * 18
+        num = f"{n:,}"
+        f = grot(13, "Bold" if i == 0 else "Medium")
+        nw = pix().getlength(num)
+        host = fit_left(_host(name), 234 - nw - 22, f)
+        c.text((8, y), host, f)
+        hx = 8 + f.getlength(host) + 4
+        for xx in range(int(hx), int(242 - nw - 4), 3):
+            c.d.point((xx, y - 1), fill=INK)
+        c.text((242, y), num, pix(), anchor="rs")
+    return c.finish()
+
+
+def snack_c(top: list, blocked: int) -> Image.Image:
+    """Receipt: inverted header, big count, the domain underneath."""
+    if not top:
+        return _no_snack("CHECK ADGUARD")
+    name, n = top[0]
+    c = Canvas()
+    c.rect(0, 0, W, 26)
+    c.text((125, 17), "BIGGEST SNACK TODAY", pix(), anchor="ms", fill=PAPER)
+    num, f = fit_size(f"{n:,}", 234, (48, 42, 36), grot)
+    c.text((125, 72), num, f, anchor="ms")
+    txt, df = _domain(_host(name), 234, (17, 15, 13))
+    c.text((125, 94), txt, df, anchor="ms")
+    share = f"{n / blocked * 100:.0f}% OF EVERYTHING EATEN" if blocked else ""
+    for xx in range(8, 242, 4):
+        c.rect(xx, 101, 2, 1)
+    c.text((125, 115), share, pix(), anchor="ms")
+    return c.finish()
+
+
+def render_snack(style: str, top: list, blocked: int) -> Image.Image:
+    if style == "B":
+        return snack_b(top)
+    return snack_c(top, blocked) if style == "C" else snack_a(top)
+
+
+# ================================================================ on repeat (Spotify top items)
+
+def _hatch_art(size=106) -> Image.Image:
+    im = Image.new("1", (size, size), 255)
+    d = ImageDraw.Draw(im)
+    for i in range(-size, size, 6):
+        d.line([(i, size), (i + size, 0)], fill=0)
+    d.rectangle([0, 0, size - 1, size - 1], outline=0)
+    return im
+
+
+def _no_top(why: str) -> Image.Image:
+    c = Canvas()
+    c.paste_bits(_hatch_art(), (8, 8))
+    x = 124
+    c.text((x, 15), "ON REPEAT", pix())
+    c.text((x - 1, 44), "No plays yet", grot(17))
+    c.text((x, 62), "Play some music.", vt(18))
+    c.rect(x, 84, 118, 1)
+    c.text((x, 100), fit(why, 118, pix()), pix())
+    return c.finish()
+
+
+def repeat_a(t: Top) -> Image.Image:
+    """Cover: the most played track, like Sleeve, with the top artist underneath."""
+    if not t.tracks:
+        return _no_top(t.note or "NOTHING IN 4 WEEKS")
+    c = Canvas()
+    c.paste_bits(t.track_art or _hatch_art(), (8, 8))
+    x, w = 124, 118
+    c.text((x, 15), "ON REPEAT · 4 WEEKS", pix())
+    title, tf = fit_size(t.tracks[0][0], w, (19, 17, 15), grot)
+    c.text((x - 1, 42), title, tf)
+    c.text((x, 59), fit(t.tracks[0][1], w, vt(19)), vt(19))
+    c.rect(x, 74, w, 1)
+    if t.artists:
+        c.text((x, 90), "TOP ARTIST", pix())
+        c.text((x - 1, 108), fit(t.artists[0], w, grot(15)), grot(15))
+    return c.finish()
+
+
+def repeat_b(t: Top) -> Image.Image:
+    """Chart: the top five tracks, numbered."""
+    c = Canvas()
+    c.text((8, 18), "YOUR TOP 5", pix())
+    c.text((242, 18), "LAST 4 WEEKS", pix(), anchor="rs")
+    c.rect(8, 23, 234, 2)
+    if not t.tracks:
+        c.text((125, 70), "Nothing yet.", grot(20), anchor="ms")
+        c.text((125, 92), fit(t.note or "PLAY SOME MUSIC", 220, pix()), pix(), anchor="ms")
+        return c.finish()
+    for i, (title, artist) in enumerate(t.tracks[:5]):
+        y = 41 + i * 18
+        first = i == 0
+        c.text((20, y), str(i + 1), grot(15 if first else 13), anchor="rs")
+        f = grot(14 if first else 13, "Bold" if first else "Medium")
+        tt = fit(title, 130, f)
+        c.text((28, y), tt, f)
+        c.text((242, y), fit(artist.upper(), 234 - 28 - f.getlength(tt) - 10, pix()), pix(), anchor="rs")
+    return c.finish()
+
+
+def repeat_c(t: Top) -> Image.Image:
+    """Artist: the top artist's photo, dithered, with the next two."""
+    if not t.artists:
+        return _no_top(t.note or "NOTHING IN 4 WEEKS")
+    c = Canvas()
+    c.paste_bits(t.artist_art or _hatch_art(), (136, 8))
+    c.text((8, 18), "MOST PLAYED ARTIST", pix())
+    lines = _wrap2(t.artists[0], 122, grot(22))
+    for i, ln in enumerate(lines):
+        c.text((7, 46 + i * 22), ln, grot(22))
+    c.rect(8, 82, 120, 1)
+    rest = t.artists[1:3]
+    for i, a in enumerate(rest):
+        c.text((8, 97 + i * 13), fit(f"{i + 2}. {a}".upper(), 120, pix()), pix())
+    return c.finish()
+
+
+def render_repeat(style: str, t: Top | None) -> Image.Image:
+    t = t or Top([], [], note="CONNECT SPOTIFY")
+    return {"B": repeat_b, "C": repeat_c}.get(style, repeat_a)(t)
+
+
 # ================================================================ samples (for the picker before things are set up)
 
 def _sample_events(now: datetime) -> list:
@@ -892,6 +1102,12 @@ def samples(now: datetime) -> dict:
                        "NEXT: GREEN, " + (now.date() + timedelta(days=8)).strftime("%a %-d").upper()),
         "night": {"blocked": 4812, "until": "07:00"},
         "calendar": _sample_events(now),
+        "snack": [("doubleclick.net", 1204), ("www.googletagmanager.com", 866), ("graph.facebook.com", 512),
+                  ("app-measurement.com", 341), ("ads.tiktok.com", 198)],
+        "snack_total": 4812,
+        "repeat": Top([("Avril 14th", "Aphex Twin"), ("Teardrop", "Massive Attack"), ("Windowlicker", "Aphex Twin"),
+                       ("Roygbiv", "Boards of Canada"), ("Kid A", "Radiohead")],
+                      ["Aphex Twin", "Boards of Canada", "Radiohead"]),
         "reminders": [Reminder("Water the monstera", "plant", True, "NOW", 1, 8, 7),
                       Reminder("Feed Biscuit", "pet", False, "18:00", every=1, at="18:00", since_days=0),
                       Reminder("Mist the ferns", "plant", False, "FRI", every=3, since_days=1),
@@ -910,6 +1126,10 @@ def draw(name: str, style: str, data: dict, now: datetime) -> Image.Image:
         return render_bins(style, b) if b else render_bins(style, samples(now)["bins"])
     if name == "reminders":
         return render_reminders(style, data.get("reminders") or [], now)
+    if name == "snack":
+        return render_snack(style, data.get("snack") or [], data.get("snack_total") or 0)
+    if name == "repeat":
+        return render_repeat(style, data.get("repeat"))
     if name == "calendar":
         cal = data.get("calendar")
         return render_calendar(style, cal if cal is not None else [], now)

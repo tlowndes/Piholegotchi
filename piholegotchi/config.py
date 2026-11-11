@@ -11,8 +11,8 @@ CONFIG_DIR = Path(os.environ.get("PIHOLEGOTCHI_HOME", Path.home() / ".config" / 
 CONFIG_FILE = CONFIG_DIR / "config.json"
 _lock = threading.Lock()
 
-DEFAULT_SCREENS = {"muncher": True, "weather": True, "server": True, "calendar": True, "bins": True, "reminders": True}
-DEFAULT_STYLES = {"server": "A", "weather": "A", "bins": "A", "reminders": "A", "night": "A", "calendar": "A"}
+DEFAULT_SCREENS = {"muncher": True, "weather": True, "server": True, "calendar": True, "snack": True, "repeat": True, "bins": True, "reminders": True}
+DEFAULT_STYLES = {"server": "A", "weather": "A", "bins": "A", "reminders": "A", "night": "A", "calendar": "A", "snack": "A", "repeat": "A"}
 
 
 @dataclass

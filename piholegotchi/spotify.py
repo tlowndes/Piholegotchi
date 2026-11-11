@@ -15,11 +15,13 @@ from PIL import Image
 
 from .config import CONFIG_DIR
 from .render import ART, Track, atkinson
+from .screens import Top
 
 log = logging.getLogger(__name__)
 
 TOKEN_URL = "https://accounts.spotify.com/api/token"
 NOW_URL = "https://api.spotify.com/v1/me/player/currently-playing"
+TOP_URL = "https://api.spotify.com/v1/me/top/"
 TOKEN_FILE = CONFIG_DIR / "spotify.json"
 
 
@@ -117,4 +119,51 @@ class Spotify:
             duration_s=(item.get("duration_ms") or 0) // 1000,
             is_playing=bool(data.get("is_playing")),
             art=self._art(album.get("images", [])),
+        )
+
+    # ------------------------------------------------------------ on repeat
+
+    @property
+    def can_top(self) -> bool:
+        """Signed in with the top-items permission (added after the first version)."""
+        try:
+            return "user-top-read" in json.loads(self.token_file.read_text()).get("scope", "")
+        except (FileNotFoundError, json.JSONDecodeError):
+            return False
+
+    def _dither(self, images: list[dict], size: int) -> Image.Image | None:
+        if not images:
+            return None
+        img = sorted(images, key=lambda i: i.get("width") or 0)
+        pick = next((i for i in img if (i.get("width") or 0) >= size * 2), img[-1])
+        try:
+            r = requests.get(pick["url"], timeout=10)
+            r.raise_for_status()
+            return atkinson(Image.open(io.BytesIO(r.content)), (size, size))
+        except Exception as e:  # noqa: BLE001
+            log.warning("image failed: %s", e)
+            return None
+
+    def top(self) -> Top:
+        """Most played over the last four weeks (Spotify's shortest window)."""
+        if not self.configured:
+            return Top([], [], note="CONNECT SPOTIFY")
+        if not self.can_top:
+            return Top([], [], note="RECONNECT SPOTIFY")
+        try:
+            h = {"Authorization": f"Bearer {self._token()}"}
+            tr = requests.get(TOP_URL + "tracks", params={"time_range": "short_term", "limit": 5}, headers=h, timeout=10)
+            ar = requests.get(TOP_URL + "artists", params={"time_range": "short_term", "limit": 3}, headers=h, timeout=10)
+            tr.raise_for_status()
+            ar.raise_for_status()
+        except Exception as e:  # noqa: BLE001
+            log.warning("spotify top failed: %s", e)
+            return Top([], [], note="CAN'T REACH SPOTIFY")
+        tracks = tr.json().get("items") or []
+        artists = ar.json().get("items") or []
+        return Top(
+            tracks=[(t["name"], ", ".join(a["name"] for a in t.get("artists", []))) for t in tracks],
+            artists=[a["name"] for a in artists],
+            track_art=self._dither(tracks[0].get("album", {}).get("images", []), ART) if tracks else None,
+            artist_art=self._dither(artists[0].get("images", []), ART) if artists else None,
         )

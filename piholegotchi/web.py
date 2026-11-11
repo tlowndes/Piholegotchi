@@ -130,13 +130,18 @@ def make_handler(state: "State"):
             if path == "/preview.png":
                 q = parse_qs(self.path.partition("?")[2])
                 name, style = q.get("screen", [""])[0], q.get("style", ["A"])[0]
-                if name not in ("server", "weather", "bins", "reminders", "night", "calendar") or style not in STYLES:
+                if name not in ("server", "weather", "bins", "reminders", "night", "calendar", "snack", "repeat") or style not in STYLES:
                     return self._send(404, b"not found", "text/plain")
                 now = datetime.now()
                 live, fake = dict(state.data), samples(now)
                 use = {k: live.get(k) if live.get(k) is not None else fake[k] for k in fake}
                 if name == "reminders" and not Config.load().reminders:
                     use["reminders"] = fake["reminders"]
+                if name == "snack":
+                    with state.lock:
+                        s = state.stats
+                    if s and s.top:
+                        use["snack"], use["snack_total"] = s.top, s.blocked
                 if name == "night":
                     with state.lock:
                         s = state.stats
@@ -164,6 +169,10 @@ def make_handler(state: "State"):
                                     for r in schedule.reminders(cfg.reminders, now)}
                 out["bins_next"] = schedule.next_text(cfg.bins, now.date() - timedelta(days=1)) if cfg.bins else ""
                 out["spotify_connected"] = TOKEN_FILE.exists()
+                try:
+                    out["spotify_top"] = "user-top-read" in json.loads(TOKEN_FILE.read_text()).get("scope", "")
+                except (FileNotFoundError, json.JSONDecodeError):
+                    out["spotify_top"] = False
                 out["version"] = updater.installed()[:7]
                 out["update"] = dict(update_status)
                 return self._json(out)
