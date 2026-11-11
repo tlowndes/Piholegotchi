@@ -9,17 +9,23 @@ from __future__ import annotations
 import io
 import json
 import logging
+import re
+import secrets
 import threading
 import time
+from datetime import date, datetime, timedelta
+from urllib.parse import parse_qs
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PIL import Image
 
-from . import spotify_auth, updater
+from . import schedule, spotify_auth, updater, weather
 from .adguard import AdGuard
-from .config import Config
+from .config import DEFAULT_SCREENS, Config
+from .screens import STYLES, draw, samples
+from .server import Glances
 from .spotify import TOKEN_FILE
 
 if TYPE_CHECKING:
@@ -36,6 +42,46 @@ def _png(img1: Image.Image, scale: int = 4) -> bytes:
     buf = io.BytesIO()
     rgb.resize((img1.width * scale, img1.height * scale), Image.NEAREST).save(buf, "PNG")
     return buf.getvalue()
+
+
+KINDS = ("plant", "pet", "other")
+TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+def _clean_bins(raw) -> list[dict]:
+    out = []
+    for b in (raw or [])[:6]:
+        name = str(b.get("name") or "").strip()[:14]
+        if not name:
+            continue
+        try:
+            first = date.fromisoformat(str(b.get("next") or ""))
+        except ValueError:
+            raise ValueError(f"Pick the next collection date for the {name} bin.")
+        every = int(b.get("every") or 1)
+        if every not in (1, 2, 3, 4):
+            every = 1
+        out.append({"name": name, "label": str(b.get("label") or "").strip()[:10],
+                    "next": first.isoformat(), "every": every})
+    return out
+
+
+def _clean_reminders(raw, old: list[dict]) -> list[dict]:
+    known = {r.get("id"): r for r in old}
+    out = []
+    for r in (raw or [])[:12]:
+        title = str(r.get("title") or "").strip()[:40]
+        if not title:
+            continue
+        at = str(r.get("at") or "").strip()
+        if at and not TIME_RE.match(at):
+            raise ValueError(f"Use a 24-hour time like 18:00 for “{title}”.")
+        rid = str(r.get("id") or "") if r.get("id") in known else secrets.token_hex(4)
+        prev = known.get(rid, {})
+        out.append({"id": rid, "title": title, "kind": r.get("kind") if r.get("kind") in KINDS else "other",
+                    "every": max(1, min(365, int(r.get("every") or 1))), "at": at,
+                    "last": prev.get("last", "")})
+    return out
 
 
 def make_handler(state: "State"):
@@ -80,6 +126,17 @@ def make_handler(state: "State"):
                 if img is None:
                     return self._send(503, b"starting", "text/plain")
                 return self._send(200, _png(img), "image/png")
+            if path == "/preview.png":
+                q = parse_qs(self.path.partition("?")[2])
+                name, style = q.get("screen", [""])[0], q.get("style", ["A"])[0]
+                if name not in ("server", "weather", "bins", "reminders") or style not in STYLES:
+                    return self._send(404, b"not found", "text/plain")
+                now = datetime.now()
+                live, fake = dict(state.data), samples(now)
+                use = {k: live.get(k) if live.get(k) is not None else fake[k] for k in fake}
+                if name == "reminders" and not Config.load().reminders:
+                    use["reminders"] = fake["reminders"]
+                return self._send(200, _png(draw(name, style, use, now), 2), "image/png")
             if path == "/api/state":
                 cfg = Config.load()
                 with state.lock:
@@ -96,6 +153,10 @@ def make_handler(state: "State"):
                             "online": s.online, "note": s.note},
                     }
                 out["config"] = cfg.public()
+                now = datetime.now()
+                out["reminders"] = {r.id: {"due": r.due, "when": r.when}
+                                    for r in schedule.reminders(cfg.reminders, now)}
+                out["bins_next"] = schedule.next_text(cfg.bins, now.date() - timedelta(days=1)) if cfg.bins else ""
                 out["spotify_connected"] = TOKEN_FILE.exists()
                 out["version"] = updater.installed()[:7]
                 out["update"] = dict(update_status)
@@ -168,6 +229,88 @@ def make_handler(state: "State"):
                 cfg.save()
                 state.refresh_soon()
                 return self._json({"ok": True})
+
+            if path == "/api/rotation":
+                if isinstance(body.get("screens"), dict):
+                    cfg.screens = {k: bool(body["screens"].get(k, cfg.screens.get(k, True))) for k in DEFAULT_SCREENS}
+                if isinstance(body.get("styles"), dict):
+                    for k, v in body["styles"].items():
+                        if k in cfg.styles and v in STYLES:
+                            cfg.styles[k] = v
+                if body.get("music_mode") in ("sleeve", "nudges", "rotate"):
+                    cfg.music_mode = body["music_mode"]
+                if body.get("rotate_minutes") in (1, 2, 5, 10, 30):
+                    cfg.rotate_minutes = body["rotate_minutes"]
+                cfg.save()
+                state.refresh_soon()
+                return self._json({"ok": True})
+
+            if path == "/api/weather":
+                place = (body.get("place") or "").strip()[:60]
+                if not place:
+                    cfg.weather_place = cfg.weather_name = ""
+                    cfg.weather_lat = cfg.weather_lon = 0.0
+                    cfg.save()
+                    state.refresh_soon()
+                    return self._json({"ok": True, "message": "Weather turned off."})
+                try:
+                    hit = weather.geocode(place)
+                except Exception as e:  # noqa: BLE001
+                    return self._json({"error": f"Couldn't reach the weather service: {e}"}, 502)
+                if not hit:
+                    return self._json({"error": f"Couldn't find “{place}”. Try a nearby town or city."}, 400)
+                cfg.weather_place, cfg.weather_name = place, hit["name"]
+                cfg.weather_lat, cfg.weather_lon = hit["lat"], hit["lon"]
+                cfg.save()
+                state.refresh_soon(stats_too=True)
+                return self._json({"ok": True, "message": f"Saved. Showing weather for {hit['name']}."})
+
+            if path == "/api/server":
+                url = (body.get("url") or "").strip().rstrip("/")
+                if url and not url.startswith(("http://", "https://")):
+                    url = "http://" + url
+                if url and not re.search(r":\d+$", url.split("//", 1)[1].split("/")[0]):
+                    url += ":61208"                  # Glances' usual port
+                s = Glances(url).get() if url else None
+                if body.get("save"):
+                    cfg.server_url = url
+                    cfg.save()
+                    state.refresh_soon(stats_too=True)
+                if s is None:
+                    return self._json({"ok": bool(body.get("save")), "message": "Server screen turned off." if body.get("save") else "Add the address first."})
+                if not s.online:
+                    return self._json({"ok": False, "message": "Couldn't reach Glances there. Check it's running and the port (usually 61208)."})
+                return self._json({"ok": True, "message": f"Connected. Disk {s.disk:.0f}% full, CPU {s.cpu:.0f}%, up {s.uptime.lower()}."})
+
+            if path == "/api/bins":
+                try:
+                    cfg.bins = _clean_bins(body.get("bins"))
+                except ValueError as e:
+                    return self._json({"error": str(e)}, 400)
+                cfg.save()
+                state.refresh_soon()
+                n = schedule.next_collection(cfg.bins, datetime.now().date() - timedelta(days=1))
+                when = f" Next collection: {' and '.join(n[1])}, {n[0].strftime('%A %-d %B')}." if n else ""
+                return self._json({"ok": True, "message": "Saved." + when})
+
+            if path == "/api/reminders":
+                try:
+                    cfg.reminders = _clean_reminders(body.get("reminders"), cfg.reminders)
+                except (ValueError, TypeError) as e:
+                    return self._json({"error": str(e)}, 400)
+                cfg.save()
+                state.refresh_soon()
+                return self._json({"ok": True, "reminders": cfg.reminders})
+
+            if path == "/api/reminders/done":
+                rid = body.get("id")
+                for r in cfg.reminders:
+                    if r["id"] == rid:
+                        r["last"] = datetime.now().isoformat(timespec="minutes")
+                        cfg.save()
+                        state.refresh_soon()
+                        return self._json({"ok": True})
+                return self._json({"error": "That reminder has gone. Refresh the page."}, 404)
 
             if path == "/api/update/check":
                 try:

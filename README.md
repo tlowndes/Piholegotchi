@@ -20,7 +20,7 @@ The panel is 250 × 122 pixels, black or white, with no greys. Every screen is d
 - **Album art.** Atkinson dithering. It keeps more white than Floyd–Steinberg, so covers stay light and readable on paper-white e-ink.
 - **Refresh.** E-ink flashes black and white on a full refresh. The progress bar uses quick partial refreshes every 10 seconds, and a full refresh only happens on a track change, a mood change, or every 30 partials to clear ghosting.
 - **Settings page.** A small web page on the Pi with a live view of the screen, so setup needs no SSH after install.
-- **Switching.** When Spotify stops, a paused track stays up for 2 minutes, then Muncher takes over.
+- **Switching.** When Spotify stops, a paused track stays up for 2 minutes, then Muncher and the other screens take turns (every 2 minutes by default). While music plays, bins and reminders can cut in for a minute, at most every 10 minutes. Both are settings.
 - **Stats.** Muncher counts what AdGuard Home blocked over its stats window (24 hours by default), checked every 5 minutes.
 
 ### Muncher's moods
@@ -31,6 +31,22 @@ The panel is 250 × 122 pixels, black or white, with no greys. Every screen is d
 | 12–22% | Content | <img src="docs/screens/muncher-content.png" width="250" alt="Content: happy eyes, chewing"> |
 | over 22% | Stuffed | <img src="docs/screens/muncher-stuffed.png" width="250" alt="Stuffed: happy eyes, ads flying in"> |
 | AdGuard down | Asleep | <img src="docs/screens/muncher-asleep.png" width="250" alt="Asleep: closed eyes, Zzz"> |
+
+### More screens
+
+Each has three styles, picked on the settings page. Bins and reminders only show when something's due.
+
+| | A | B | C |
+|---|---|---|---|
+| Server health | <img src="docs/screens/server-a.png" width="250" alt="Box face"> | <img src="docs/screens/server-b.png" width="250" alt="Gauges"> | <img src="docs/screens/server-c.png" width="250" alt="Panic mode"> |
+| Weather and clock | <img src="docs/screens/weather-a.png" width="250" alt="Big clock"> | <img src="docs/screens/weather-b.png" width="250" alt="Forecast strip"> | <img src="docs/screens/weather-c.png" width="250" alt="Window"> |
+| Bin day | <img src="docs/screens/bins-a.png" width="250" alt="Bin buddy"> | <img src="docs/screens/bins-b.png" width="250" alt="Calendar"> | <img src="docs/screens/bins-c.png" width="250" alt="Loud"> |
+| Plants and pets | <img src="docs/screens/reminders-a.png" width="250" alt="Thirsty plant"> | <img src="docs/screens/reminders-b.png" width="250" alt="Checklist"> | <img src="docs/screens/reminders-c.png" width="250" alt="Sticky note"> |
+
+- **Weather** comes from [Open-Meteo](https://open-meteo.com): free, no account. Checked every 20 minutes.
+- **Server health** reads [Glances](https://github.com/nicolargo/glances), which you install from the ZimaOS app store. It shows the biggest drive, checked every minute.
+- **Bin day** shows from 4pm the day before until 10am on the day. You enter each bin's next collection date and how often it goes out.
+- **Plants and pets** are reminders you add on the settings page, and tick off there with **Done**.
 
 ## Hardware
 
@@ -68,7 +84,9 @@ On your phone or laptop, go to **http://piholegotchi.local**. If that doesn't lo
 - **AdGuard Home:** the address you open AdGuard's dashboard on, including the port (e.g. `http://192.168.1.20:3000`), and your AdGuard login. Use **Test connection** to check it, then **Save**.
 - **Spotify:** follow the four steps on the page. You make a free developer app at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard), paste its client ID, then sign in. Spotify only sends sign-ins back to secure addresses or to the device itself, so you'll land on a page that doesn't load. Copy that page's address into the last box and press **Finish**.
 
-You can come back to this page any time to change either.
+Further down, pick which screens take turns and their styles, set your town for the weather, your server's Glances address, your bin days, and any plant or pet reminders.
+
+You can come back to this page any time to change any of it.
 
 <img src="docs/screens/settings-page.png" width="500" alt="The settings page: a live view of the e-ink screen above Spotify and AdGuard Home settings">
 

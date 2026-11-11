@@ -79,6 +79,33 @@ footer{color:var(--muted);font-size:13px;text-align:center}
 .switch input:checked::after{transform:translateX(18px)}
 .switch b{font-weight:500}
 .hint{color:var(--muted);font-size:13.5px}
+.picker{display:grid;gap:14px}
+.scr{display:grid;gap:10px;padding-top:14px;border-top:1px solid var(--line)}
+.scr:first-child{border-top:0;padding-top:0}
+.styles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.styles label{display:grid;gap:4px;cursor:pointer;font:500 11.5px var(--mono);letter-spacing:.06em;color:var(--muted);text-align:center}
+.styles label{position:relative}
+.styles input{position:absolute;top:0;left:0;width:1px;height:1px;margin:0;opacity:0;pointer-events:none}
+.styles img{display:block;width:100%;aspect-ratio:250/122;image-rendering:pixelated;border-radius:4px;border:2px solid transparent;outline:1px solid var(--line);background:#dcdcd2}
+.styles input:checked+img{border-color:var(--accent);outline-color:var(--accent)}
+.styles input:checked~span{color:var(--accent)}
+.styles input:focus-visible+img{outline:2px solid var(--accent);outline-offset:2px}
+.scr.off .styles{opacity:.45}
+.choice{display:grid;gap:8px}
+.choice label{display:flex;gap:10px;align-items:flex-start;font-weight:400;font-size:15px;cursor:pointer}
+.choice input{width:auto;margin:4px 0 0;accent-color:var(--accent)}
+select{font:15px var(--sans);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-width:0}
+.list{display:grid;gap:10px}
+.item{display:grid;gap:8px;grid-template-columns:minmax(0,2fr) minmax(0,1.2fr) minmax(0,1.4fr) minmax(0,1.1fr) auto;align-items:end;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.item.rem{grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,.9fr) minmax(0,1fr) auto}
+.item .field label{font-size:12px;color:var(--muted);font-weight:500}
+.item input,.item select{background:var(--surface);padding:8px 10px;font-size:14px;width:100%}
+.item .acts{display:flex;gap:6px;align-items:center}
+.item .status{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13.5px;color:var(--muted)}
+.item .status b{color:var(--fg);font-weight:500}
+.item .status .due{color:var(--bad)}
+button.x{padding:8px 10px;color:var(--muted)}
+@media (max-width:600px){.item,.item.rem{grid-template-columns:1fr 1fr}.item .field.wide{grid-column:1/-1}}
 [hidden]{display:none!important}
 @media (max-width:520px){.device{padding:9px 9px 6px;border-radius:10px}.glass{padding:4px}}
 @media (prefers-reduced-motion:no-preference){.glass img{transition:opacity .25s}}
@@ -154,11 +181,66 @@ footer{color:var(--muted);font-size:13px;text-align:center}
   </section>
 
   <section aria-labelledby="sc-h">
-    <div class="sechead"><h2 id="sc-h">Screen</h2></div>
+    <div class="sechead"><h2 id="sc-h">Screens</h2></div>
+    <p class="lead">When nothing's playing, these take turns. Bins and reminders only join in when something's due. Tap a style to pick it.</p>
+    <div class="picker" id="picker"></div>
+    <div class="grid2">
+      <div class="field"><label for="rotate">Change screen every</label>
+        <select id="rotate"><option value="1">1 minute</option><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="30">30 minutes</option></select>
+        <span class="hint">Each change makes the e-ink flash once.</span></div>
+    </div>
+    <fieldset class="choice" style="border:0;padding:0;margin:0">
+      <legend style="font-weight:500;font-size:13.5px;margin-bottom:8px">While music plays</legend>
+      <label><input type="radio" name="music" value="sleeve" id="mm-sleeve"><span><b>Only Sleeve.</b> <span class="hint">Everything else waits until the music stops.</span></span></label>
+      <label><input type="radio" name="music" value="nudges" id="mm-nudges"><span><b>Sleeve, with bins and reminders cutting in.</b> <span class="hint">For a minute, at most every 10 minutes.</span></span></label>
+      <label><input type="radio" name="music" value="rotate" id="mm-rotate"><span><b>Take turns with everything.</b> <span class="hint">Sleeve joins the rotation.</span></span></label>
+    </fieldset>
     <label class="switch" for="flip">
       <input type="checkbox" id="flip" role="switch">
       <span><b>Flip upside down</b><br><span class="hint">For when the Pi is mounted with the cable on top.</span></span>
     </label>
+    <p class="msg" id="sc-msg" role="status"></p>
+  </section>
+
+  <section aria-labelledby="wx-h">
+    <div class="sechead"><h2 id="wx-h">Weather</h2><span id="wx-pill" class="pill off">Not set up</span></div>
+    <form id="wx-form" style="display:grid;gap:12px">
+      <div class="field"><label for="wx-place">Your town or city</label>
+        <input id="wx-place" autocomplete="address-level2" placeholder="e.g. Bristol"></div>
+      <div class="row"><button class="primary" type="submit">Save</button></div>
+      <p class="msg" id="wx-msg" role="status"></p>
+    </form>
+    <p class="hint" style="margin:0">Forecasts from Open-Meteo. Free, no account.</p>
+  </section>
+
+  <section aria-labelledby="sv-h">
+    <div class="sechead"><h2 id="sv-h">Server health</h2><span id="sv-pill" class="pill off">Not set up</span></div>
+    <ol class="steps">
+      <li><div><p>On your ZimaOS dashboard, open the <b>App Store</b>, find <b>Glances</b> and install it.</p></div></li>
+      <li><div class="field">
+        <label for="sv-url">Your server's address</label>
+        <input id="sv-url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://192.168.1.20:61208">
+        <span class="hint">The same address as your ZimaOS dashboard. The port is added for you if you leave it off.</span>
+        <div class="row"><button class="primary" id="sv-save" type="button">Save</button><button id="sv-test" type="button">Test connection</button></div>
+      </div></li>
+    </ol>
+    <p class="msg" id="sv-msg" role="status"></p>
+  </section>
+
+  <section aria-labelledby="bn-h">
+    <div class="sechead"><h2 id="bn-h">Bin day</h2><span id="bn-pill" class="pill off">No bins</span></div>
+    <p class="lead">Shows from 4pm the day before until 10am on the day.</p>
+    <div class="list" id="bins"></div>
+    <div class="row"><button type="button" id="bn-add">Add a bin</button><button class="primary" type="button" id="bn-save">Save bins</button></div>
+    <p class="msg" id="bn-msg" role="status"></p>
+  </section>
+
+  <section aria-labelledby="rm-h">
+    <div class="sechead"><h2 id="rm-h">Plants and pets</h2><span id="rm-pill" class="pill off">None yet</span></div>
+    <p class="lead">Reminders show when they're due. Tap Done here when you've done it.</p>
+    <div class="list" id="rems"></div>
+    <div class="row"><button type="button" id="rm-add">Add a reminder</button><button class="primary" type="button" id="rm-save">Save reminders</button></div>
+    <p class="msg" id="rm-msg" role="status"></p>
   </section>
 
   <section aria-labelledby="up-h">
@@ -176,7 +258,7 @@ footer{color:var(--muted);font-size:13px;text-align:center}
 
 <script>
 const $ = id => document.getElementById(id);
-let lastFrame = -1, pwSet = false, loaded = false;
+let lastFrame = -1, pwSet = false, loaded = false, remState = {};
 
 async function api(path, body){
   const r = await fetch(path, {method: body ? 'POST' : 'GET',
@@ -192,7 +274,7 @@ async function poll(){
   try{
     const s = await api('/api/state');
     if (s.frame !== lastFrame){ lastFrame = s.frame; $('screen').src = '/screen.png?f=' + s.frame; }
-    const what = {sleeve:'Sleeve', muncher:'Muncher', setup:'the setup screen'}[s.screen] || 'Starting';
+    const what = {sleeve:'Sleeve', muncher:'Muncher', setup:'the setup screen', weather:'Weather', server:'Server health', bins:'Bin day', reminders:'Reminders'}[s.screen] || 'Starting';
     $('now').innerHTML = '';
     const b = document.createElement('b'); b.textContent = 'Showing ' + what;
     $('now').append(b, document.createTextNode((s.detail ? ' · ' + s.detail : '') + ' · updated ' + ago(s.now - s.updated)));
@@ -209,8 +291,23 @@ async function poll(){
     pwSet = cfg.adguard_password_set;
     $('ver').textContent = s.version ? 'Version ' + s.version : 'Version unknown';
     if (s.update && s.update.message){ say($('up-msg'), s.update.message, !/failed/i.test(s.update.message)); }
+    $('wx-pill').textContent = cfg.weather_name ? cfg.weather_name : 'Not set up'; $('wx-pill').className = 'pill ' + (cfg.weather_name ? 'on' : 'off');
+    $('sv-pill').textContent = cfg.server_url ? 'Set up' : 'Not set up'; $('sv-pill').className = 'pill ' + (cfg.server_url ? 'on' : 'off');
+    $('bn-pill').textContent = cfg.bins.length ? (s.bins_next ? s.bins_next.replace('NEXT: ', '') : cfg.bins.length + ' bins') : 'No bins';
+    $('bn-pill').className = 'pill ' + (cfg.bins.length ? 'on' : 'off');
+    const dueN = Object.values(s.reminders || {}).filter(r => r.due).length;
+    $('rm-pill').textContent = cfg.reminders.length ? (dueN ? dueN + ' due' : 'All done') : 'None yet';
+    $('rm-pill').className = 'pill ' + (cfg.reminders.length ? 'on' : 'off');
+    remState = s.reminders || {}; paintRemStatus();
     if (!loaded){
       loaded = true;
+      buildPicker(cfg);
+      $('rotate').value = String(cfg.rotate_minutes || 2);
+      (document.getElementById('mm-' + (cfg.music_mode || 'nudges')) || {}).checked = true;
+      $('wx-place').value = cfg.weather_name || cfg.weather_place || '';
+      $('sv-url').value = cfg.server_url || '';
+      cfg.bins.forEach(addBin);
+      cfg.reminders.forEach(addRem); paintRemStatus();
       $('flip').checked = !!cfg.flip;
       $('sp-client').value = cfg.spotify_client_id || '';
       $('ag-url').value = cfg.adguard_url || '';
@@ -260,6 +357,129 @@ $('flip').addEventListener('change', async () => {
   catch(e){ $('flip').checked = !$('flip').checked; }
 });
 
+/* Screens picker */
+const SCREENS = [
+  {id:'muncher', name:'Muncher', hint:'Ad-blocking stats from AdGuard.'},
+  {id:'weather', name:'Weather and clock', styles:['Big clock','Forecast strip','Window']},
+  {id:'server', name:'Server health', styles:['Box face','Gauges','Panic mode']},
+  {id:'bins', name:'Bin day', styles:['Bin buddy','Calendar','Loud']},
+  {id:'reminders', name:'Plants and pets', styles:['Thirsty plant','Checklist','Sticky note']},
+];
+function buildPicker(cfg){
+  const box = $('picker'); box.innerHTML = '';
+  SCREENS.forEach(sc => {
+    const wrap = document.createElement('div'); wrap.className = 'scr';
+    const on = cfg.screens[sc.id] !== false;
+    wrap.classList.toggle('off', !on);
+    wrap.innerHTML = `<label class="switch" for="on-${sc.id}"><input type="checkbox" id="on-${sc.id}" role="switch"><span><b>${sc.name}</b>${sc.hint ? '<br><span class="hint">' + sc.hint + '</span>' : ''}</span></label>`;
+    const sw = wrap.querySelector('input'); sw.checked = on;
+    sw.addEventListener('change', () => { wrap.classList.toggle('off', !sw.checked); saveRotation({screens: {[sc.id]: sw.checked}}); });
+    if (sc.styles){
+      const st = document.createElement('div'); st.className = 'styles'; st.setAttribute('role', 'radiogroup'); st.setAttribute('aria-label', sc.name + ' style');
+      ['A','B','C'].forEach((k, i) => {
+        const l = document.createElement('label');
+        l.innerHTML = `<input type="radio" name="st-${sc.id}" id="st-${sc.id}-${k}" value="${k}"><img data-src="/preview.png?screen=${sc.id}&style=${k}" alt="${sc.styles[i]}"><span>${k} · ${sc.styles[i].toUpperCase()}</span>`;
+        const r = l.querySelector('input'); r.checked = (cfg.styles[sc.id] || 'A') === k;
+        r.addEventListener('change', () => saveRotation({styles: {[sc.id]: k}}));
+        st.append(l);
+      });
+      wrap.append(st);
+    }
+    box.append(wrap);
+  });
+  refreshThumbs();
+}
+function refreshThumbs(){
+  const t = Date.now();
+  document.querySelectorAll('.styles img').forEach(im => { im.src = im.dataset.src + '&t=' + t; });
+}
+async function saveRotation(change){
+  try{ await api('/api/rotation', change); say($('sc-msg'), 'Saved.', true); setTimeout(() => say($('sc-msg'), ''), 2000); setTimeout(poll, 2000); }
+  catch(e){ say($('sc-msg'), e.message); }
+}
+$('rotate').addEventListener('change', () => saveRotation({rotate_minutes: Number($('rotate').value)}));
+document.querySelectorAll('input[name=music]').forEach(r => r.addEventListener('change', () => saveRotation({music_mode: r.value})));
+
+/* Weather */
+$('wx-form').addEventListener('submit', async e => {
+  e.preventDefault(); say($('wx-msg'), 'Looking it up…', true);
+  try{ const r = await api('/api/weather', {place: $('wx-place').value}); say($('wx-msg'), r.message, true); setTimeout(() => { poll(); refreshThumbs(); }, 4000); }
+  catch(e){ say($('wx-msg'), e.message); }
+});
+
+/* Server */
+async function server(save){
+  say($('sv-msg'), save ? 'Saving…' : 'Testing…', true);
+  try{ const r = await api('/api/server', {url: $('sv-url').value, save}); say($('sv-msg'), (save && r.ok ? 'Saved. ' : '') + r.message, r.ok); if (save) setTimeout(() => { poll(); refreshThumbs(); }, 3000); }
+  catch(e){ say($('sv-msg'), e.message); }
+}
+$('sv-save').addEventListener('click', () => server(true));
+$('sv-test').addEventListener('click', () => server(false));
+
+/* Bins */
+let rowN = 0;
+function addBin(b){
+  b = b || {name:'', label:'', next:'', every:1}; const n = ++rowN;
+  const el = document.createElement('div'); el.className = 'item';
+  el.innerHTML = `<div class="field wide"><label for="bn-name-${n}">Bin</label><input id="bn-name-${n}" maxlength="14" placeholder="Black"></div>
+    <div class="field"><label for="bn-label-${n}">For</label><input id="bn-label-${n}" maxlength="10" placeholder="Waste"></div>
+    <div class="field"><label for="bn-next-${n}">Next collection</label><input id="bn-next-${n}" type="date"></div>
+    <div class="field"><label for="bn-every-${n}">Every</label><select id="bn-every-${n}"><option value="1">Week</option><option value="2">2 weeks</option><option value="3">3 weeks</option><option value="4">4 weeks</option></select></div>
+    <div class="acts"><button type="button" class="x" aria-label="Remove this bin">Remove</button></div>`;
+  el.querySelector(`#bn-name-${n}`).value = b.name; el.querySelector(`#bn-label-${n}`).value = b.label;
+  el.querySelector(`#bn-next-${n}`).value = b.next; el.querySelector(`#bn-every-${n}`).value = String(b.every || 1);
+  el.querySelector('.x').addEventListener('click', () => el.remove());
+  $('bins').append(el);
+}
+$('bn-add').addEventListener('click', () => { addBin(); $('bins').lastElementChild.querySelector('input').focus(); });
+$('bn-save').addEventListener('click', async () => {
+  const bins = [...$('bins').children].map(el => { const f = el.querySelectorAll('input,select');
+    return {name: f[0].value, label: f[1].value, next: f[2].value, every: Number(f[3].value)}; }).filter(b => b.name.trim());
+  try{ const r = await api('/api/bins', {bins}); say($('bn-msg'), r.message, true); poll(); }
+  catch(e){ say($('bn-msg'), e.message); }
+});
+
+/* Reminders */
+function addRem(r){
+  r = r || {id:'', title:'', kind:'plant', every:7, at:''}; const n = ++rowN;
+  const el = document.createElement('div'); el.className = 'item rem'; el.dataset.id = r.id || '';
+  el.innerHTML = `<div class="field wide"><label for="rm-title-${n}">Reminder</label><input id="rm-title-${n}" maxlength="40" placeholder="Water the monstera"></div>
+    <div class="field"><label for="rm-kind-${n}">Type</label><select id="rm-kind-${n}"><option value="plant">Plant</option><option value="pet">Pet</option><option value="other">Other</option></select></div>
+    <div class="field"><label for="rm-every-${n}">Every (days)</label><input id="rm-every-${n}" type="number" min="1" max="365" inputmode="numeric"></div>
+    <div class="field"><label for="rm-at-${n}">At (optional)</label><input id="rm-at-${n}" type="time"></div>
+    <div class="acts"><button type="button" class="x" aria-label="Remove this reminder">Remove</button></div>
+    <div class="status" hidden><span></span><button type="button" class="done">Done</button></div>`;
+  el.querySelector(`#rm-title-${n}`).value = r.title; el.querySelector(`#rm-kind-${n}`).value = r.kind;
+  el.querySelector(`#rm-every-${n}`).value = r.every; el.querySelector(`#rm-at-${n}`).value = r.at || '';
+  el.querySelector('.x').addEventListener('click', () => el.remove());
+  el.querySelector('.done').addEventListener('click', async () => {
+    try{ await api('/api/reminders/done', {id: el.dataset.id}); say($('rm-msg'), 'Nice one. Marked as done.', true); poll(); }
+    catch(e){ say($('rm-msg'), e.message); }
+  });
+  $('rems').append(el);
+}
+function paintRemStatus(){
+  [...$('rems').children].forEach(el => {
+    const st = remState[el.dataset.id], box = el.querySelector('.status');
+    if (!st){ box.hidden = true; return; }
+    box.hidden = false;
+    const span = box.querySelector('span');
+    span.innerHTML = ''; const b = document.createElement('b');
+    if (st.due){ b.textContent = 'Due now'; b.className = 'due'; } else { b.textContent = 'Next: ' + st.when.toLowerCase().replace(/^in (\d+)d$/, 'in $1 days'); }
+    span.append(b);
+  });
+}
+$('rm-add').addEventListener('click', () => { addRem(); $('rems').lastElementChild.querySelector('input').focus(); });
+$('rm-save').addEventListener('click', async () => {
+  const reminders = [...$('rems').children].map(el => { const f = el.querySelectorAll('input,select');
+    return {id: el.dataset.id, title: f[0].value, kind: f[1].value, every: Number(f[2].value) || 1, at: f[3].value}; }).filter(r => r.title.trim());
+  try{
+    const r = await api('/api/reminders', {reminders});
+    $('rems').innerHTML = ''; r.reminders.forEach(addRem);
+    say($('rm-msg'), 'Saved.', true); poll(); refreshThumbs();
+  }catch(e){ say($('rm-msg'), e.message); }
+});
+
 /* Software */
 let latestSha = '';
 $('up-check').addEventListener('click', async () => {
@@ -297,7 +517,7 @@ document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click'
   catch{ const r = document.createRange(); r.selectNodeContents($(b.dataset.copy)); getSelection().removeAllRanges(); getSelection().addRange(r); }
 }));
 
-poll(); setInterval(poll, 5000);
+poll(); setInterval(poll, 5000); setInterval(refreshThumbs, 60000);
 </script>
 </body>
 </html>
