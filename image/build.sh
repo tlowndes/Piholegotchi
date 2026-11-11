@@ -47,7 +47,7 @@ echo "==> Installing Python packages inside the image"
 chroot "$ROOT" /usr/bin/env DEBIAN_FRONTEND=noninteractive bash -euxc '
   apt-get update
   apt-get install -y --no-install-recommends python3-pil python3-requests python3-spidev \
-      python3-gpiozero python3-lgpio avahi-daemon
+      python3-gpiozero python3-lgpio avahi-daemon iw
   apt-get clean
   rm -rf /var/lib/apt/lists/*
 '
@@ -75,6 +75,15 @@ sed -i 's/\braspberrypi\b/piholegotchi/g' "$ROOT/etc/hosts"
 
 install -m 644 "$REPO/image/piholegotchi.service" "$ROOT/etc/systemd/system/piholegotchi.service"
 ln -sf /etc/systemd/system/piholegotchi.service "$ROOT/etc/systemd/system/multi-user.target.wants/piholegotchi.service"
+
+echo "==> Wifi: power saving off, and a watchdog that restarts it if the router goes missing"
+install -d "$ROOT/etc/NetworkManager/conf.d"
+install -m 644 "$REPO/image/wifi-powersave-off.conf" "$ROOT/etc/NetworkManager/conf.d/piholegotchi-wifi-powersave-off.conf"
+install -m 755 "$REPO/image/piholegotchi-wifi.sh" "$ROOT/usr/local/sbin/piholegotchi-wifi"
+install -m 644 "$REPO/image/piholegotchi-wifi.service" "$ROOT/etc/systemd/system/piholegotchi-wifi.service"
+install -m 644 "$REPO/image/piholegotchi-wifi.timer" "$ROOT/etc/systemd/system/piholegotchi-wifi.timer"
+install -d "$ROOT/etc/systemd/system/timers.target.wants"
+ln -sf /etc/systemd/system/piholegotchi-wifi.timer "$ROOT/etc/systemd/system/timers.target.wants/piholegotchi-wifi.timer"
 
 umount "$ROOT/etc/resolv.conf" 2>/dev/null || true
 mv "$ROOT/etc/resolv.conf.build" "$ROOT/etc/resolv.conf"
