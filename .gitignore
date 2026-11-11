@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+vendor/
+live.png
+preview/
+.env
