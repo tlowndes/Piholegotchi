@@ -5,7 +5,9 @@ Wants=network-online.target
 
 [Service]
 User=piholegotchi
-WorkingDirectory=/opt/piholegotchi
+# lgpio writes small files into the working directory, so it must be writable
+WorkingDirectory=/var/lib/piholegotchi
+Environment=PYTHONPATH=/opt/piholegotchi
 Environment=PIHOLEGOTCHI_HOME=/var/lib/piholegotchi
 ExecStart=/usr/bin/python3 -m piholegotchi
 # lets the settings page use port 80 without running as root

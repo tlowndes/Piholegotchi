@@ -90,6 +90,7 @@ footer{color:var(--muted);font-size:13px;text-align:center}
       <div class="devbar"><span id="live" class="live">Live</span><span>250×122 · 1-bit</span></div>
     </div>
   </div>
+  <p class="msg err" id="err" role="alert"></p>
   <div class="now">
     <p id="now">Loading…</p>
     <button class="quiet" id="refresh" type="button">Refresh screen</button>
@@ -171,6 +172,7 @@ async function poll(){
     const b = document.createElement('b'); b.textContent = 'Showing ' + what;
     $('now').append(b, document.createTextNode((s.detail ? ' · ' + s.detail : '') + ' · updated ' + ago(s.now - s.updated)));
     $('live').classList.toggle('stale', s.now - s.updated > 30);
+    $('err').textContent = s.error || '';
 
     const c = s.spotify_connected;
     $('sp-pill').textContent = c ? 'Connected' : 'Not connected'; $('sp-pill').className = 'pill ' + (c ? 'on' : 'off');

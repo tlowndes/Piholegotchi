@@ -47,3 +47,13 @@ class PngDisplay:
 
     def sleep(self):
         pass
+
+
+class NullDisplay:
+    """Used when the panel can't start, so the settings page still runs."""
+
+    def show(self, img: Image.Image, full: bool):
+        pass
+
+    def sleep(self):
+        pass

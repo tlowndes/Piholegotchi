@@ -88,6 +88,7 @@ def make_handler(state: "State"):
                         "screen": state.screen,
                         "detail": state.detail,
                         "updated": state.updated,
+                        "error": state.error,
                         "now": time.time(),
                         "stats": None if s is None else {
                             "total": s.total, "blocked": s.blocked, "percent": round(s.percent, 1),

@@ -52,6 +52,7 @@ class State:
         self.stats: Stats | None = None
         self.updated = 0.0
         self.stats_stale = True           # fetch AdGuard stats on the next pass
+        self.error = ""                   # shown on the settings page
 
     def publish(self, img, screen, detail, stats):
         with self.lock:
@@ -73,16 +74,22 @@ def main():
     a = ap.parse_args()
     logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"), format="%(asctime)s %(message)s")
 
+    state = State()
+    from .web import serve
+    serve(state, a.port)        # start the settings page first, so it works even if the screen doesn't
+
     if a.png:
         from .display import PngDisplay
         panel = PngDisplay()
     else:
-        from .display import EPaper
-        panel = EPaper()
-
-    state = State()
-    from .web import serve
-    serve(state, a.port)
+        try:
+            from .display import EPaper
+            panel = EPaper()
+        except Exception as e:  # noqa: BLE001
+            log.exception("e-ink screen didn't start")
+            state.error = f"The e-ink screen didn't start: {e}"
+            from .display import NullDisplay
+            panel = NullDisplay()
 
     stopping = False
 
@@ -136,17 +143,25 @@ def main():
         data = img.tobytes()
         if data != last_bytes:
             full = key != last_key or partials >= FULL_EVERY
-            panel.show(img, full=full)
-            partials = 0 if full else partials + 1
-            last_key, last_bytes = key, data
+            try:
+                panel.show(img, full=full)
+                partials = 0 if full else partials + 1
+                last_key, last_bytes = key, data
+            except Exception as e:  # noqa: BLE001 - keep the settings page alive
+                log.exception("screen update failed")
+                state.error = f"Screen update failed: {e}"
+                last_key = None
         state.publish(img, key[0], detail, stats)
 
         state.wake.wait(SPOTIFY_EVERY)
         state.wake.clear()
 
     # e-ink keeps its image with no power, so leave a sleeping face behind
-    panel.show(muncher(Stats(0, 0, 0.0, online=False, note="SWITCHED OFF")), full=True)
-    panel.sleep()
+    try:
+        panel.show(muncher(Stats(0, 0, 0.0, online=False, note="SWITCHED OFF")), full=True)
+        panel.sleep()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 if __name__ == "__main__":
