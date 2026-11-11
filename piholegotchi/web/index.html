@@ -202,6 +202,25 @@ button.x{padding:8px 10px;color:var(--muted)}
     <p class="msg" id="sc-msg" role="status"></p>
   </section>
 
+  <section aria-labelledby="nt-h">
+    <div class="sechead"><h2 id="nt-h">Night mode</h2><span id="nt-pill" class="pill off">Off</span></div>
+    <p class="lead">One quiet screen overnight. The e-ink is left alone and powered down until morning.</p>
+    <label class="switch" for="nt-on">
+      <input type="checkbox" id="nt-on" role="switch">
+      <span><b>Sleep at night</b></span>
+    </label>
+    <div class="grid2">
+      <div class="field"><label for="nt-from">From</label><input type="time" id="nt-from" step="300" value="23:00"></div>
+      <div class="field"><label for="nt-to">Until</label><input type="time" id="nt-to" step="300" value="07:00"></div>
+    </div>
+    <div class="styles" role="radiogroup" aria-label="Night mode style" id="nt-styles"></div>
+    <label class="switch" for="nt-music">
+      <input type="checkbox" id="nt-music" role="switch">
+      <span><b>Wake up for music</b><br><span class="hint">Shows Sleeve if Spotify plays at night, then goes back to sleep.</span></span>
+    </label>
+    <p class="msg" id="nt-msg" role="status"></p>
+  </section>
+
   <section aria-labelledby="wx-h">
     <div class="sechead"><h2 id="wx-h">Weather</h2><span id="wx-pill" class="pill off">Not set up</span></div>
     <form id="wx-form" style="display:grid;gap:12px">
@@ -299,6 +318,8 @@ async function poll(){
     $('rm-pill').textContent = cfg.reminders.length ? (dueN ? dueN + ' due' : 'All done') : 'None yet';
     $('rm-pill').className = 'pill ' + (cfg.reminders.length ? 'on' : 'off');
     remState = s.reminders || {}; paintRemStatus();
+    $('nt-pill').textContent = cfg.night ? cfg.night_from + '–' + cfg.night_to : 'Off';
+    $('nt-pill').className = 'pill ' + (cfg.night ? 'on' : 'off');
     if (!loaded){
       loaded = true;
       buildPicker(cfg);
@@ -309,6 +330,7 @@ async function poll(){
       cfg.bins.forEach(addBin);
       cfg.reminders.forEach(addRem); paintRemStatus();
       $('flip').checked = !!cfg.flip;
+      buildNight(cfg);
       $('sp-client').value = cfg.spotify_client_id || '';
       $('ag-url').value = cfg.adguard_url || '';
       $('ag-user').value = cfg.adguard_username || '';
@@ -399,6 +421,31 @@ async function saveRotation(change){
 }
 $('rotate').addEventListener('change', () => saveRotation({rotate_minutes: Number($('rotate').value)}));
 document.querySelectorAll('input[name=music]').forEach(r => r.addEventListener('change', () => saveRotation({music_mode: r.value})));
+
+/* Night mode */
+function buildNight(cfg){
+  $('nt-on').checked = !!cfg.night; $('nt-music').checked = !!cfg.night_music;
+  $('nt-from').value = cfg.night_from; $('nt-to').value = cfg.night_to;
+  const box = $('nt-styles'); box.innerHTML = '';
+  ['Tucked in','Moon','Night sky'].forEach((n, i) => {
+    const k = 'ABC'[i], l = document.createElement('label');
+    l.innerHTML = `<input type="radio" name="st-night" id="st-night-${k}" value="${k}"><img data-src="/preview.png?screen=night&style=${k}" alt="${n}"><span>${k} · ${n.toUpperCase()}</span>`;
+    const r = l.querySelector('input'); r.checked = (cfg.styles.night || 'A') === k;
+    r.addEventListener('change', () => saveRotation({styles: {night: k}}));
+    box.append(l);
+  });
+  box.style.opacity = cfg.night ? '' : '.45';
+  refreshThumbs();
+}
+async function saveNight(){
+  const on = $('nt-on').checked;
+  $('nt-styles').style.opacity = on ? '' : '.45';
+  try{
+    await api('/api/night', {on, music: $('nt-music').checked, from: $('nt-from').value, to: $('nt-to').value});
+    say($('nt-msg'), 'Saved.', true); setTimeout(() => say($('nt-msg'), ''), 2000); setTimeout(poll, 2000);
+  }catch(e){ say($('nt-msg'), e.message); }
+}
+['nt-on','nt-music','nt-from','nt-to'].forEach(id => $(id).addEventListener('change', saveNight));
 
 /* Weather */
 $('wx-form').addEventListener('submit', async e => {

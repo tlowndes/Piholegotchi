@@ -175,6 +175,7 @@ def main():
     server, next_server = None, 0.0
     track, paused_since = None, None
     last_key, last_bytes, partials = None, None, 0
+    night = None                              # ((style, until), image) while night mode is on
     st = {"rot": Rotator(), "nudge": None, "nudge_i": -1, "nudge_until": 0.0, "next_nudge": 0.0,
           "was_playing": False}
 
@@ -229,7 +230,17 @@ def main():
             ip = local_ip()
             img, key = setup_screen(socket.gethostname(), ip), ("setup", ip)
             detail = "Waiting to be set up"
+        elif (cfg.night and schedule.is_night(clock, cfg.night_from, cfg.night_to)
+              and not (cfg.night_music and track is not None)):
+            style = cfg.styles.get("night", "A")
+            if night is None or night[0] != (style, cfg.night_to):
+                # drawn once as night starts, so the panel isn't touched again until morning
+                n = {"blocked": stats.blocked if stats and stats.online else None, "until": cfg.night_to}
+                night = ((style, cfg.night_to), draw("night", style, {"night": n}, clock))
+            img, key = night[1], ("night", style)
+            detail = f"Night mode until {cfg.night_to}"
         else:
+            night = None
             name = plan(cfg, track is not None, nudges, ambient, now, st)
             style = cfg.styles.get(name, "A")
             if name == "sleeve" and track:
@@ -254,6 +265,8 @@ def main():
                 panel.show(shown, full=full)
                 partials = 0 if full else partials + 1
                 last_key, last_bytes = key, pixels
+                if key[0] == "night":
+                    panel.sleep()             # e-ink holds the picture with the power off
             except Exception as e:  # noqa: BLE001 - keep the settings page alive
                 log.exception("screen update failed")
                 state.error = f"Screen update failed: {e}"

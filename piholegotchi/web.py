@@ -129,13 +129,18 @@ def make_handler(state: "State"):
             if path == "/preview.png":
                 q = parse_qs(self.path.partition("?")[2])
                 name, style = q.get("screen", [""])[0], q.get("style", ["A"])[0]
-                if name not in ("server", "weather", "bins", "reminders") or style not in STYLES:
+                if name not in ("server", "weather", "bins", "reminders", "night") or style not in STYLES:
                     return self._send(404, b"not found", "text/plain")
                 now = datetime.now()
                 live, fake = dict(state.data), samples(now)
                 use = {k: live.get(k) if live.get(k) is not None else fake[k] for k in fake}
                 if name == "reminders" and not Config.load().reminders:
                     use["reminders"] = fake["reminders"]
+                if name == "night":
+                    with state.lock:
+                        s = state.stats
+                    use["night"] = {"blocked": s.blocked if s and s.online else fake["night"]["blocked"],
+                                    "until": Config.load().night_to}
                 return self._send(200, _png(draw(name, style, use, now), 2), "image/png")
             if path == "/api/state":
                 cfg = Config.load()
@@ -241,6 +246,22 @@ def make_handler(state: "State"):
                     cfg.music_mode = body["music_mode"]
                 if body.get("rotate_minutes") in (1, 2, 5, 10, 30):
                     cfg.rotate_minutes = body["rotate_minutes"]
+                cfg.save()
+                state.refresh_soon()
+                return self._json({"ok": True})
+
+            if path == "/api/night":
+                for k in ("from", "to"):
+                    if k in body and not TIME_RE.match(str(body[k])):
+                        return self._json({"error": "Use a 24-hour time like 23:00."}, 400)
+                if "on" in body:
+                    cfg.night = bool(body["on"])
+                if "music" in body:
+                    cfg.night_music = bool(body["music"])
+                cfg.night_from = body.get("from", cfg.night_from)
+                cfg.night_to = body.get("to", cfg.night_to)
+                if cfg.night_from == cfg.night_to:
+                    return self._json({"error": "Pick different start and end times."}, 400)
                 cfg.save()
                 state.refresh_soon()
                 return self._json({"ok": True})

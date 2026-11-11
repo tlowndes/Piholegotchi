@@ -12,7 +12,7 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 _lock = threading.Lock()
 
 DEFAULT_SCREENS = {"muncher": True, "weather": True, "server": True, "bins": True, "reminders": True}
-DEFAULT_STYLES = {"server": "A", "weather": "A", "bins": "A", "reminders": "A"}
+DEFAULT_STYLES = {"server": "A", "weather": "A", "bins": "A", "reminders": "A", "night": "A"}
 
 
 @dataclass
@@ -28,6 +28,12 @@ class Config:
     styles: dict = field(default_factory=lambda: dict(DEFAULT_STYLES))
     music_mode: str = "nudges"  # while Spotify plays: "sleeve", "nudges" or "rotate"
     rotate_minutes: int = 2     # how long each screen stays up before the next
+
+    # night mode: one quiet screen, no refreshes, panel asleep
+    night: bool = True
+    night_from: str = "23:00"
+    night_to: str = "07:00"
+    night_music: bool = True    # wake up for Sleeve if music plays at night
 
     weather_place: str = ""     # what was typed, e.g. "Bristol"
     weather_name: str = ""      # what it matched, e.g. "Bristol, England"

@@ -63,6 +63,8 @@ def main():
     for screen in ("server", "weather", "bins", "reminders"):
         for st in STYLES:
             shots[f"{screen}-{st.lower()}"] = draw(screen, st, data, now)
+    for st in STYLES:
+        shots[f"night-{st.lower()}"] = draw("night", st, data, now)
     for name, img in shots.items():
         img.save(out / f"{name}-1bit.png")
         to_eink(img).save(out / f"{name}.png")

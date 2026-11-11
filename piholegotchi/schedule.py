@@ -86,3 +86,20 @@ def reminders(items: list[dict], now: datetime) -> list[Reminder]:
             since_days=since, every=int(r.get("every") or 1), at=r.get("at", ""), id=r.get("id", ""))))
     out.sort(key=lambda p: (not p[1].due, p[0]))
     return [r for _, r in out]
+
+
+def _mins(hhmm: str) -> int:
+    h, m = hhmm.split(":")
+    return int(h) * 60 + int(m)
+
+
+def is_night(now: datetime, start: str, end: str) -> bool:
+    """True between `start` and `end` (24-hour "HH:MM"), across midnight if need be."""
+    try:
+        a, b = _mins(start), _mins(end)
+    except (ValueError, AttributeError):
+        return False
+    t = now.hour * 60 + now.minute
+    if a == b:
+        return False
+    return a <= t < b if a < b else (t >= a or t < b)

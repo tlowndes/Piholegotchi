@@ -42,11 +42,13 @@ Each has three styles, picked on the settings page. Bins and reminders only show
 | Weather and clock | <img src="docs/screens/weather-a.png" width="250" alt="Big clock"> | <img src="docs/screens/weather-b.png" width="250" alt="Forecast strip"> | <img src="docs/screens/weather-c.png" width="250" alt="Window"> |
 | Bin day | <img src="docs/screens/bins-a.png" width="250" alt="Bin buddy"> | <img src="docs/screens/bins-b.png" width="250" alt="Calendar"> | <img src="docs/screens/bins-c.png" width="250" alt="Loud"> |
 | Plants and pets | <img src="docs/screens/reminders-a.png" width="250" alt="Thirsty plant"> | <img src="docs/screens/reminders-b.png" width="250" alt="Checklist"> | <img src="docs/screens/reminders-c.png" width="250" alt="Sticky note"> |
+| Night mode | <img src="docs/screens/night-a.png" width="250" alt="Tucked in"> | <img src="docs/screens/night-b.png" width="250" alt="Moon"> | <img src="docs/screens/night-c.png" width="250" alt="Night sky"> |
 
 - **Weather** comes from [Open-Meteo](https://open-meteo.com): free, no account. Checked every 20 minutes.
 - **Server health** reads [Glances](https://github.com/nicolargo/glances), which you install from the ZimaOS app store. It shows the biggest drive, checked every minute.
 - **Bin day** shows from 4pm the day before until 10am on the day. You enter each bin's next collection date and how often it goes out.
 - **Plants and pets** are reminders you add on the settings page, and tick off there with **Done**.
+- **Night mode** shows one quiet screen from 11pm to 7am (change the times on the settings page), then powers the panel down so it isn't refreshed until morning. Music still wakes it for Sleeve unless you turn that off.
 
 ## Hardware
 

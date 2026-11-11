@@ -658,6 +658,71 @@ def render_reminders(style: str, items: list[Reminder], now: datetime) -> Image.
     return reminders_c(items) if style == "C" else reminders_a(items)
 
 
+# ================================================================ night mode
+
+def _star(d, x, y, s=2, ink=INK):
+    d.line([(x - s, y), (x + s, y)], fill=ink)
+    d.line([(x, y - s), (x, y + s)], fill=ink)
+
+
+def _crescent(d, cx, cy, r, ink=INK, bg=PAPER):
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=ink)
+    o = int(r * .55)
+    d.ellipse([cx - r + o, cy - r - o // 2, cx + r + o, cy + r - o // 2], fill=bg)
+
+
+def night_a(blocked: int | None, until: str) -> Image.Image:
+    """Tucked in: the Muncher asleep in a nightcap."""
+    from .render import _creature
+    c = Canvas()
+    _creature(c, "asleep")
+    c.d.rectangle([52, 10, 72, 36], fill=PAPER)          # the cap goes where the antenna was
+    c.d.polygon([(22, 40), (74, 40), (92, 22), (60, 12), (40, 18)], fill=INK)
+    c.d.rectangle([20, 36, 76, 42], fill=PAPER, outline=INK, width=2)
+    c.d.ellipse([88, 18, 98, 28], fill=PAPER, outline=INK, width=2)
+    c.text((100, 52), "z", vt(16))
+    c.text((107, 42), "Z", vt(22))
+    x = 130
+    c.text((x, 24), "LIGHTS OUT", pix())
+    c.text((x - 1, 49), "Night night.", grot(19))
+    line = f"Ate {blocked:,} today." if blocked else "Sweet dreams."
+    c.text((x, 66), fit(line, 116, vt(19)), vt(19))
+    c.rect(x, 82, 112, 1)
+    c.text((x, 96), "MOOD: ASLEEP", pix())
+    c.text((x, 109), f"BACK AT {until}", pix())
+    return c.finish()
+
+
+def night_b(until: str) -> Image.Image:
+    """Moon: almost nothing on screen."""
+    c = Canvas()
+    _crescent(c.d, 125, 50, 26)
+    for x, y, s in ((70, 28, 2), (92, 70, 1), (170, 22, 2), (186, 62, 1), (58, 60, 1), (160, 80, 1)):
+        _star(c.d, x, y, s)
+    c.text((125, 108), f"SLEEPING TILL {until}", pix(), anchor="ms")
+    return c.finish()
+
+
+def night_c(until: str) -> Image.Image:
+    """Night sky: inverted, the darkest option for a dark room."""
+    c = Canvas(bg=INK)
+    _crescent(c.d, 60, 58, 30, ink=PAPER, bg=INK)
+    for x, y, s in ((110, 20, 2), (232, 16, 1), (120, 96, 1), (20, 18, 1), (100, 70, 1), (236, 100, 2), (24, 104, 1)):
+        _star(c.d, x, y, s, ink=PAPER)
+    x = 130
+    c.text((x - 1, 52), "Zzz.", grot(30), fill=PAPER)
+    c.text((x, 70), "Shh, sleeping.", vt(20), fill=PAPER)
+    c.rect(x, 82, 100, 1, PAPER)
+    c.text((x, 96), f"BACK AT {until}", pix(), fill=PAPER)
+    return c.finish()
+
+
+def render_night(style: str, blocked: int | None, until: str) -> Image.Image:
+    if style == "B":
+        return night_b(until)
+    return night_c(until) if style == "C" else night_a(blocked, until)
+
+
 # ================================================================ samples (for the picker before things are set up)
 
 def samples(now: datetime) -> dict:
@@ -671,6 +736,7 @@ def samples(now: datetime) -> dict:
         "bins": BinDay(datetime.combine(now.date() + timedelta(days=1), datetime.min.time()), True,
                        [Bin("Black", "Waste", True), Bin("Green", "Garden", False), Bin("Blue", "Recycle", True)],
                        "NEXT: GREEN, " + (now.date() + timedelta(days=8)).strftime("%a %-d").upper()),
+        "night": {"blocked": 4812, "until": "07:00"},
         "reminders": [Reminder("Water the monstera", "plant", True, "NOW", 1, 8, 7),
                       Reminder("Feed Biscuit", "pet", False, "18:00", every=1, at="18:00", since_days=0),
                       Reminder("Mist the ferns", "plant", False, "FRI", every=3, since_days=1),
@@ -679,7 +745,7 @@ def samples(now: datetime) -> dict:
 
 
 def draw(name: str, style: str, data: dict, now: datetime) -> Image.Image:
-    """One of the four extra screens, from the latest data (None where it isn't set up)."""
+    """One of the extra screens, from the latest data (None where it isn't set up)."""
     if name == "server":
         return render_server(style, data.get("server"))
     if name == "weather":
@@ -689,4 +755,7 @@ def draw(name: str, style: str, data: dict, now: datetime) -> Image.Image:
         return render_bins(style, b) if b else render_bins(style, samples(now)["bins"])
     if name == "reminders":
         return render_reminders(style, data.get("reminders") or [], now)
+    if name == "night":
+        n = data.get("night") or {}
+        return render_night(style, n.get("blocked"), n.get("until", "07:00"))
     raise ValueError(name)
