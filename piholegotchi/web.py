@@ -130,13 +130,18 @@ def make_handler(state: "State"):
             if path == "/preview.png":
                 q = parse_qs(self.path.partition("?")[2])
                 name, style = q.get("screen", [""])[0], q.get("style", ["A"])[0]
-                if name not in ("server", "weather", "bins", "reminders", "night", "calendar", "snack", "repeat") or style not in STYLES:
+                if name not in ("server", "weather", "bins", "reminders", "night", "calendar", "snack", "repeat", "deck", "focus") or style not in STYLES:
                     return self._send(404, b"not found", "text/plain")
                 now = datetime.now()
                 live, fake = dict(state.data), samples(now)
                 use = {k: live.get(k) if live.get(k) is not None else fake[k] for k in fake}
                 if name == "reminders" and not Config.load().reminders:
                     use["reminders"] = fake["reminders"]
+                fd = state.flightdeck.snapshot(time.time())
+                if fd["deck"]:
+                    use["deck"] = fd["deck"]
+                if fd["focus"]:
+                    use["focus"] = fd["focus"]
                 if name == "snack":
                     with state.lock:
                         s = state.stats
@@ -168,6 +173,11 @@ def make_handler(state: "State"):
                 out["reminders"] = {r.id: {"due": r.due, "when": r.when}
                                     for r in schedule.reminders(cfg.reminders, now)}
                 out["bins_next"] = schedule.next_text(cfg.bins, now.date() - timedelta(days=1)) if cfg.bins else ""
+                fd = state.flightdeck.snapshot(time.time())
+                f, d = fd["focus"], fd["deck"]
+                out["focus"] = None if f is None else {"task": f.task, "running": f.running, "left": f.left(time.time()),
+                                                       "total": f.total_s, "source": f.source}
+                out["deck_sent"] = d.sent.isoformat(timespec="minutes") if d and d.sent else ""
                 out["spotify_connected"] = TOKEN_FILE.exists()
                 try:
                     out["spotify_top"] = "user-top-read" in json.loads(TOKEN_FILE.read_text()).get("scope", "")
@@ -277,6 +287,36 @@ def make_handler(state: "State"):
                 except Exception as e:  # noqa: BLE001
                     return self._json({"error": f"AdGuard didn't take it: {e}"}, 502)
                 state.refresh_soon(stats_too=True)
+                return self._json({"ok": True})
+
+            if path == "/api/deck":                  # from the Flight Deck app
+                try:
+                    state.flightdeck.receive(body)
+                except (TypeError, ValueError, AttributeError) as e:
+                    return self._json({"error": f"Couldn't read that: {e}"}, 400)
+                if body:
+                    state.refresh_soon()
+                return self._json({"ok": True})
+
+            if path == "/api/focus":
+                act = body.get("action")
+                if act == "start":
+                    mins = body.get("minutes")
+                    if mins not in (5, 10, 15, 25, 45, 60, 90):
+                        return self._json({"error": "Pick how long."}, 400)
+                    if mins != cfg.focus_minutes:
+                        cfg.focus_minutes = mins
+                    state.flightdeck.start(str(body.get("task") or "").strip()[:80], mins)
+                elif act == "pause":
+                    state.flightdeck.pause()
+                elif act == "stop":
+                    state.flightdeck.stop()
+                elif act == "settings":
+                    cfg.focus_over_music = bool(body.get("over_music"))
+                else:
+                    return self._json({"error": "Unknown action."}, 400)
+                cfg.save()
+                state.refresh_soon()
                 return self._json({"ok": True})
 
             if path == "/api/calendar":

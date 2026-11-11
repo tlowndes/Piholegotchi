@@ -130,6 +130,26 @@ button.x{padding:8px 10px;color:var(--muted)}
     <button class="quiet" id="refresh" type="button">Refresh screen</button>
   </div>
 
+  <section aria-labelledby="fc-h">
+    <div class="sechead"><h2 id="fc-h">Focus</h2><span id="fc-pill" class="pill off">Off</span></div>
+    <p class="lead" id="fc-text">Start a session and the screen counts it down. Sessions you start in Flight Deck show here too.</p>
+    <div class="grid2" id="fc-new">
+      <div class="field"><label for="fc-task">Working on</label><input id="fc-task" maxlength="80" placeholder="e.g. Portfolio case study"></div>
+      <div class="field"><label for="fc-mins">For</label>
+        <select id="fc-mins"><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="25">25 minutes</option><option value="45">45 minutes</option><option value="60">1 hour</option><option value="90">90 minutes</option></select></div>
+    </div>
+    <div class="row">
+      <button class="primary" type="button" id="fc-start">Start focus</button>
+      <button type="button" id="fc-pause" hidden>Pause</button>
+      <button type="button" id="fc-stop" hidden>Stop</button>
+    </div>
+    <label class="switch" for="fc-music">
+      <input type="checkbox" id="fc-music" role="switch">
+      <span><b>Show over music</b><br><span class="hint">The timer replaces Sleeve while a session runs.</span></span>
+    </label>
+    <p class="msg" id="fc-msg" role="status"></p>
+  </section>
+
   <section aria-labelledby="pz-h" id="pz" hidden>
     <div class="sechead"><h2 id="pz-h">Ad blocking</h2><span id="pz-pill" class="pill on">On</span></div>
     <p class="lead" id="pz-text">Need to get past a blocked link? Pause it for a bit. It comes back on by itself.</p>
@@ -356,6 +376,7 @@ async function poll(){
     $('ag-pill').textContent = ag; $('ag-pill').className = 'pill ' + (ag === 'Connected' ? 'on' : 'off');
     pwSet = cfg.adguard_password_set;
     paintPause(cfg, st, s.now);
+    paintFocus(s.focus);
     $('ver').textContent = s.version ? 'Version ' + s.version : 'Version unknown';
     if (s.update && s.update.message){ say($('up-msg'), s.update.message, !/failed/i.test(s.update.message)); }
     $('wx-pill').textContent = cfg.weather_name ? cfg.weather_name : 'Not set up'; $('wx-pill').className = 'pill ' + (cfg.weather_name ? 'on' : 'off');
@@ -382,6 +403,7 @@ async function poll(){
       $('flip').checked = !!cfg.flip;
       buildNight(cfg);
       $('pz-mins').value = String(cfg.pause_minutes || 5); pzLabel();
+      $('fc-mins').value = String(cfg.focus_minutes || 25); $('fc-music').checked = !!cfg.focus_over_music;
       $('mu-party').checked = !!cfg.muncher_party; $('mu-starve').value = String(cfg.starve_minutes);
       $('sp-client').value = cfg.spotify_client_id || '';
       $('ag-url').value = cfg.adguard_url || '';
@@ -438,6 +460,8 @@ const SCREENS = [
   {id:'muncher', name:'Muncher', hint:'Ad-blocking stats from AdGuard.'},
   {id:'weather', name:'Weather and clock', styles:['Big clock','Forecast strip','Window']},
   {id:'server', name:'Server health', styles:['Box face','Gauges','Panic mode']},
+  {id:'deck', name:'Flight Deck', hint:'Your day from the Flight Deck app. Turn it on in the app under Settings › Piholegotchi.', styles:['Next step','Tiles','Job hunt']},
+  {id:'focus', name:'Focus', hint:'Takes over while a Focus session runs, from the app or below.', styles:['Ring','Bar','Muncher']},
   {id:'snack', name:'Biggest snack', hint:'The domain AdGuard blocked most today.', styles:['Plate','Menu','Receipt']},
   {id:'repeat', name:'On repeat', hint:'Your most played on Spotify over the last four weeks.', styles:['Cover','Top 5','Artist']},
   {id:'calendar', name:'Calendar', styles:['Up next','Agenda','Countdown']},
@@ -478,6 +502,25 @@ async function saveRotation(change){
 }
 $('rotate').addEventListener('change', () => saveRotation({rotate_minutes: Number($('rotate').value)}));
 document.querySelectorAll('input[name=music]').forEach(r => r.addEventListener('change', () => saveRotation({music_mode: r.value})));
+
+/* Focus */
+function paintFocus(f){
+  const on = !!f;
+  $('fc-pill').textContent = on ? (f.running ? Math.ceil(f.left / 60) + ' min left' : 'Paused') : 'Off';
+  $('fc-pill').className = 'pill ' + (on ? 'on' : 'off');
+  $('fc-new').hidden = $('fc-start').hidden = on; $('fc-pause').hidden = $('fc-stop').hidden = !on;
+  $('fc-pause').textContent = on && !f.running ? 'Resume' : 'Pause';
+  $('fc-text').textContent = on ? (f.task + (f.source === 'phone' ? ' · from Flight Deck' : '')) :
+    'Start a session and the screen counts it down. Sessions you start in Flight Deck show here too.';
+}
+async function focusDo(change){
+  try{ await api('/api/focus', change); say($('fc-msg'), ''); setTimeout(poll, 800); }
+  catch(e){ say($('fc-msg'), e.message); }
+}
+$('fc-start').addEventListener('click', () => focusDo({action: 'start', task: $('fc-task').value, minutes: Number($('fc-mins').value)}));
+$('fc-pause').addEventListener('click', () => focusDo({action: 'pause'}));
+$('fc-stop').addEventListener('click', () => focusDo({action: 'stop'}));
+$('fc-music').addEventListener('change', () => focusDo({action: 'settings', over_music: $('fc-music').checked}));
 
 /* Pause blocking */
 function pzLabel(){ const m = Number($('pz-mins').value); $('pz-go').textContent = 'Pause ads for ' + (m === 60 ? '1 hour' : m + (m === 1 ? ' minute' : ' minutes')); }

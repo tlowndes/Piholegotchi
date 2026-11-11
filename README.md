@@ -46,12 +46,16 @@ Each has three styles, picked on the settings page. Bins and reminders only show
 | Calendar | <img src="docs/screens/calendar-a.png" width="250" alt="Up next"> | <img src="docs/screens/calendar-b.png" width="250" alt="Agenda"> | <img src="docs/screens/calendar-c.png" width="250" alt="Countdown"> |
 | Biggest snack | <img src="docs/screens/snack-a.png" width="250" alt="Plate"> | <img src="docs/screens/snack-b.png" width="250" alt="Menu"> | <img src="docs/screens/snack-c.png" width="250" alt="Receipt"> |
 | On repeat | <img src="docs/screens/repeat-a.png" width="250" alt="Cover"> | <img src="docs/screens/repeat-b.png" width="250" alt="Top 5"> | <img src="docs/screens/repeat-c.png" width="250" alt="Artist"> |
+| Flight Deck | <img src="docs/screens/deck-a.png" width="250" alt="Next step"> | <img src="docs/screens/deck-b.png" width="250" alt="Tiles"> | <img src="docs/screens/deck-c.png" width="250" alt="Job hunt"> |
+| Focus | <img src="docs/screens/focus-a.png" width="250" alt="Ring"> | <img src="docs/screens/focus-b.png" width="250" alt="Bar"> | <img src="docs/screens/focus-c.png" width="250" alt="Muncher"> |
 | Bin day | <img src="docs/screens/bins-a.png" width="250" alt="Bin buddy"> | <img src="docs/screens/bins-b.png" width="250" alt="Calendar"> | <img src="docs/screens/bins-c.png" width="250" alt="Loud"> |
 | Plants and pets | <img src="docs/screens/reminders-a.png" width="250" alt="Thirsty plant"> | <img src="docs/screens/reminders-b.png" width="250" alt="Checklist"> | <img src="docs/screens/reminders-c.png" width="250" alt="Sticky note"> |
 | Night mode | <img src="docs/screens/night-a.png" width="250" alt="Tucked in"> | <img src="docs/screens/night-b.png" width="250" alt="Moon"> | <img src="docs/screens/night-c.png" width="250" alt="Night sky"> |
 
 - **Weather** comes from [Open-Meteo](https://open-meteo.com): free, no account. Checked every 20 minutes.
 - **Server health** reads [Glances](https://github.com/nicolargo/glances), which you install from the ZimaOS app store. It shows the biggest drive, checked every minute.
+- **Flight Deck** shows your day from the [Flight Deck](https://github.com/tlowndes/ObsidianCapture) app: next step, tasks due, focus minutes, habits, water and the next job follow-up. In the app, set **Settings › Piholegotchi** to this Pi's address. It sends a small JSON `POST /api/deck` whenever Deck refreshes.
+- **Focus** takes over the screen while a session runs, started in Flight Deck or from the settings page (5 to 90 minutes). It shows over Sleeve too unless you turn that off.
 - **Biggest snack** is the domain AdGuard blocked most over its stats window, from the same stats as the Muncher.
 - **On repeat** is your most played on Spotify over the last four weeks (Spotify's shortest window), checked every 6 hours. If you connected Spotify before this was added, tap **Reconnect** on the settings page once to give it the extra permission.
 - **Calendar** reads a shared ICS link. In Proton Calendar: **Settings → All settings → Calendars**, pick the calendar, then **Share with anyone → Create link** with **Full view**. Checked every 15 minutes. It takes over the screen 15 minutes before an event (change or turn off on the settings page).

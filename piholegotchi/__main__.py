@@ -23,6 +23,7 @@ from .adguard import AdGuard
 from .calendar_feed import CalendarSource
 from .config import Config
 from .moods import Moods
+from .flightdeck import FlightDeck
 from .render import Stats, mood, muncher, setup_screen, sleeve
 from .screens import draw
 from .server import Glances
@@ -70,6 +71,7 @@ class State:
         self.restart = False              # set after an update is installed
         self.data: dict = {}              # latest weather, server, bins, reminders (for the picker)
         self.moods = Moods()
+        self.flightdeck = FlightDeck()
 
     def publish(self, img, screen, detail, stats):
         with self.lock:
@@ -237,7 +239,9 @@ def main():
 
         bins = schedule.bin_day(cfg.bins, clock) if on.get("bins") else None
         rems = schedule.reminders(cfg.reminders, clock)
-        data = {"server": server, "weather": weather, "bins": bins, "reminders": rems, "calendar": events,
+        state.flightdeck.tick(now)
+        fd = state.flightdeck.snapshot(now)
+        data = {"deck": fd["deck"], "focus": fd["focus"], "focus_done": fd["focus_done"], "server": server, "weather": weather, "bins": bins, "reminders": rems, "calendar": events,
                 "snack": stats.top if stats else [], "snack_total": stats.blocked if stats else 0, "repeat": top}
         heads_up = cfg.calendar_heads_up * 60
         soon = bool(events and heads_up and not events[0].all_day
@@ -249,13 +253,14 @@ def main():
             ("server", on.get("server") and src.server.configured),
             ("calendar", on.get("calendar") and src.calendar.configured),
             ("snack", on.get("snack") and bool(stats and stats.top)),
-            ("repeat", on.get("repeat") and bool(top and top.tracks))) if ok]
+            ("repeat", on.get("repeat") and bool(top and top.tracks)),
+            ("deck", on.get("deck") and bool(fd["deck"] and fd["deck"].fresh(clock)))) if ok]
         nudges = [n for n, ok in (
             ("bins", bins is not None),
             ("reminders", on.get("reminders") and any(r.due for r in rems)),
             ("calendar", on.get("calendar") and soon)) if ok]
 
-        anything = (cfg.adguard_url or src.spotify.configured or src.weather.configured
+        anything = (fd["deck"] or fd["focus"] or cfg.adguard_url or src.spotify.configured or src.weather.configured
                     or src.server.configured or src.calendar.configured or cfg.bins or cfg.reminders)
         if not anything:
             ip = local_ip()
@@ -278,6 +283,9 @@ def main():
                 name = "muncher"                  # a record or a hungry Muncher takes over the screen
             if name != "sleeve" and "calendar" in nudges:
                 name = "calendar"                 # something's about to start
+            focusing = on.get("focus") and (fd["focus"] is not None or fd["focus_done"])
+            if focusing and (name != "sleeve" or cfg.focus_over_music):
+                name = "focus"                    # a Focus session on the phone or the settings page
             style = cfg.styles.get(name, "A")
             if name == "sleeve" and track:
                 img, key = sleeve(track), ("sleeve", track.id)
@@ -329,6 +337,8 @@ DETAILS = {
     "weather": lambda d: (f"{d['weather'].desc}, {round(d['weather'].temp)}°" if d.get("weather") else "No weather yet"),
     "server": lambda d: (f"Disk {d['server'].disk:.0f}% full" if d.get("server") and d["server"].online
                          else "Can't reach the server"),
+    "deck": lambda d: (f"Next step: {d['deck'].next_title}" if d.get("deck") else "Waiting for Flight Deck"),
+    "focus": lambda d: (f"Focus: {d['focus'].task}" if d.get("focus") else "Focus done"),
     "snack": lambda d: (f"Biggest snack: {d['snack'][0][0]}" if d.get("snack") else "Nothing eaten yet"),
     "repeat": lambda d: (f"On repeat: {d['repeat'].tracks[0][0]}" if d.get("repeat") and d["repeat"].tracks else "No plays yet"),
     "calendar": lambda d: (f"Next: {d['calendar'][0].title}" if d.get("calendar") else "Nothing on the calendar"),

@@ -1076,6 +1076,195 @@ def render_repeat(style: str, t: Top | None) -> Image.Image:
     return {"B": repeat_b, "C": repeat_c}.get(style, repeat_a)(t)
 
 
+# ================================================================ flight deck (from the phone app)
+
+def _days_word(d, now: datetime) -> str:
+    if d is None:
+        return ""
+    n = (d - now.date()).days
+    if n < 0:
+        return "OVERDUE"
+    return {0: "TODAY", 1: "TOMORROW"}.get(n, d.strftime("%a %-d %b").upper())
+
+
+def _stat(c: Canvas, x, y, w, label, value):
+    c.text((x + w / 2, y), value, grot(18), anchor="ms")
+    c.text((x + w / 2, y + 12), label, pix(), anchor="ms")
+
+
+def _no_deck(why: str) -> Image.Image:
+    c = Canvas()
+    c.d.rounded_rectangle([18, 22, 92, 100], 8, outline=INK, width=2)
+    c.rect(30, 34, 50, 6)
+    for i in range(3):
+        c.box(30, 50 + i * 15, 8, 8)
+        c.rect(44, 53 + i * 15, 34 - i * 8, 2)
+    x = 112
+    c.text((x, 24), "FLIGHT DECK", pix())
+    c.text((x - 1, 52), "No word yet", grot(19))
+    c.text((x, 70), "Open the app.", vt(20))
+    c.rect(x, 82, 130, 1)
+    c.text((x, 96), fit(why, 130, pix()), pix())
+    return c.finish()
+
+
+def deck_a(d, now: datetime) -> Image.Image:
+    """Next step: the one thing to do now, with the day's numbers underneath."""
+    if d is None:
+        return _no_deck("SET IT UP IN SETTINGS")
+    c = Canvas()
+    head = "NEXT STEP"
+    if d.next_mins:
+        head += f" · {d.next_mins} MIN"
+    when = _days_word(d.next_due, now)
+    c.text((8, 18), head, pix())
+    if when:
+        c.text((242, 18), when, pix(), anchor="rs")
+    title = d.next_title or "Nothing due. Nice."
+    lines = _wrap2(title, 234, grot(19))
+    for i, ln in enumerate(lines):
+        c.text((7, 42 + i * 20), ln, grot(19))
+    c.rect(8, 84, 234, 1)
+    stats = [("DUE", str(d.due)), ("FOCUS", f"{d.focus_min}m"),
+             ("HABITS", f"{d.habits_done}/{d.habits_total}" if d.habits_total else "-")]
+    for i, (lab, val) in enumerate(stats):
+        x = 8 + i * 78
+        if i:
+            c.rect(x - 1, 90, 1, 28)
+        _stat(c, x, 106, 78, lab, val)
+    if not d.fresh(now):
+        c.text((242, 30), "OLD", pix(), anchor="rs")
+    return c.finish()
+
+
+def deck_b(d, now: datetime) -> Image.Image:
+    """Tiles: four numbers for the day, water as a bar."""
+    if d is None:
+        return _no_deck("SET IT UP IN SETTINGS")
+    c = Canvas()
+    tiles = [("TASKS DUE", str(d.due)), ("FOCUS", f"{d.focus_min} min"),
+             ("HABITS", f"{d.habits_done} of {d.habits_total}" if d.habits_total else "None"),
+             ("JOBS OPEN", str(d.jobs_open))]
+    for i, (lab, val) in enumerate(tiles):
+        x, y = 4 + (i % 2) * 122, 4 + (i // 2) * 52
+        c.d.rounded_rectangle([x, y, x + 118, y + 47], 5, outline=INK, width=1 if i else 2)
+        c.text((x + 8, y + 14), lab, pix())
+        c.text((x + 7, y + 38), fit(val, 104, grot(20)), grot(20))
+    if d.water_goal:
+        frac = min(1.0, (d.water_ml or 0) / d.water_goal)
+        c.text((8, 118), "WATER", pix())
+        bar(c, 50, 111, 150, 8, frac)
+        c.text((242, 118), f"{(d.water_ml or 0) / 1000:.1f}L", pix(), anchor="rs")
+    else:
+        c.text((125, 118), (d.energy + " ENERGY DAY").strip().upper(), pix(), anchor="ms")
+    return c.finish()
+
+
+def deck_c(d, now: datetime) -> Image.Image:
+    """Job hunt: open applications and the next follow-up."""
+    if d is None:
+        return _no_deck("SET IT UP IN SETTINGS")
+    c = Canvas()
+    c.rect(0, 0, W, 26)
+    c.text((8, 17), "JOB HUNT", pix(), fill=PAPER)
+    c.text((242, 17), f"{d.jobs_open} OPEN", pix(), anchor="rs", fill=PAPER)
+    if d.follow_company:
+        c.text((8, 44), "FOLLOW UP " + _days_word(d.follow_date, now), pix())
+        txt, f = fit_size(d.follow_company, 234, (30, 26, 22, 18), grot)
+        c.text((6, 76), txt, f)
+        c.text((8, 96), fit(d.follow_role, 234, vt(20)), vt(20))
+        c.rect(8, 104, 234, 1)
+        c.text((8, 117), fit("NEXT STEP: " + (d.next_title or "NONE").upper(), 234, pix()), pix())
+    else:
+        c.text((8, 70), "No follow-ups due.", grot(19))
+        c.text((8, 92), f"{d.jobs_open} applications still open." if d.jobs_open else "Time to send one?", vt(20))
+    return c.finish()
+
+
+def render_deck(style: str, d, now: datetime) -> Image.Image:
+    return {"B": deck_b, "C": deck_c}.get(style, deck_a)(d, now)
+
+
+# ---------------------------------------------------------------- focus timer
+
+def _mins_left(s: int) -> str:
+    m = math.ceil(s / 60)
+    return f"{m} min" if m < 60 else f"{m // 60}h {m % 60:02d}m"
+
+
+def _focus_done(task: str) -> Image.Image:
+    from .render import _creature
+    c = Canvas()
+    _creature(c, "stuffed")
+    x = 130
+    c.text((x, 24), "FOCUS DONE", pix())
+    c.text((x - 1, 52), "Nice one.", grot(22))
+    c.text((x, 70), "Take a break.", vt(20))
+    c.rect(x, 82, 112, 1)
+    c.text((x, 96), fit(task.upper(), 112, pix()), pix())
+    return c.finish()
+
+
+def focus_a(f, now: float) -> Image.Image:
+    """Ring: time left in a ring that empties."""
+    c = Canvas()
+    left = f.left(now)
+    frac = left / f.total_s if f.total_s else 0
+    cx, cy, r = 58, 61, 50
+    c.d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=INK, width=2)
+    if frac > 0:
+        c.d.pieslice([cx - r + 6, cy - r + 6, cx + r - 6, cy + r - 6], -90, -90 + 360 * frac, fill=INK)
+    c.d.ellipse([cx - r + 16, cy - r + 16, cx + r - 16, cy + r - 16], fill=PAPER, outline=INK)
+    m = math.ceil(left / 60)
+    c.text((cx, cy + 8), str(m), grot(26 if m < 100 else 20), anchor="ms")
+    c.text((cx, cy + 20), "MIN", pix(), anchor="ms")
+    x = 124
+    c.text((x, 24), "FOCUSING" if f.running else "PAUSED", pix())
+    lines = _wrap2(f.task, 118, grot(17))
+    for i, ln in enumerate(lines):
+        c.text((x - 1, 48 + i * 18), ln, grot(17))
+    c.rect(x, 88, 118, 1)
+    c.text((x, 102), f"{f.total_s // 60} MIN SESSION", pix())
+    return c.finish()
+
+
+def focus_b(f, now: float) -> Image.Image:
+    """Bar: big time left, the task, a bar along the bottom."""
+    c = Canvas()
+    left = f.left(now)
+    c.text((8, 18), "FOCUS" if f.running else "FOCUS · PAUSED", pix())
+    c.text((242, 18), f"OF {f.total_s // 60} MIN", pix(), anchor="rs")
+    txt, ft = fit_size(_mins_left(left) + (" left" if f.running else ""), 234, (46, 40, 34), grot)
+    c.text((5, 62), txt, ft)
+    c.text((8, 86), fit(f.task, 234, grot(17)), grot(17))
+    bar(c, 8, 100, 234, 14, 1 - (left / f.total_s if f.total_s else 0))
+    return c.finish()
+
+
+def focus_c(f, now: float) -> Image.Image:
+    """Muncher: it keeps you company, eyes shut, headphones on."""
+    from .render import _creature
+    c = Canvas()
+    _creature(c, "content")
+    d = c.d
+    d.arc([10, 22, 86, 98], 180, 360, fill=INK, width=4)     # headphones
+    d.rounded_rectangle([8, 54, 20, 74], 3, fill=INK)
+    d.rounded_rectangle([76, 54, 88, 74], 3, fill=INK)
+    x = 130
+    c.text((x, 24), "SHH, FOCUSING" if f.running else "ON PAUSE", pix())
+    c.text((x - 1, 53), _mins_left(f.left(now)), grot(26))
+    c.text((x, 70), "to go.", vt(20))
+    c.rect(x, 82, 112, 1)
+    c.text((x, 96), fit(f.task.upper(), 112, pix()), pix())
+    return c.finish()
+
+
+def render_focus(style: str, f, now: float, done_task: str = "") -> Image.Image:
+    if f is None:
+        return _focus_done(done_task or "SESSION")
+    return {"B": focus_b, "C": focus_c}.get(style, focus_a)(f, now)
+
+
 # ================================================================ samples (for the picker before things are set up)
 
 def _sample_events(now: datetime) -> list:
@@ -1087,6 +1276,20 @@ def _sample_events(now: datetime) -> list:
     return [Event("Portfolio review with Sam", t, t + timedelta(hours=1), False, "Zoom"),
             Event("Climbing", base.replace(hour=19, minute=30), base.replace(hour=21, minute=0), False, ""),
             Event("Mum's birthday", tom, tom + timedelta(days=1), True, "")]
+
+
+def _sample_deck(now: datetime):
+    from datetime import timedelta
+    from .flightdeck import DeckDay
+    return DeckDay(sent=now, energy="Med", next_title="Tailor CV for the Monzo role", next_due=now.date(), next_mins=25,
+                   due=4, focus_min=50, habits_done=3, habits_total=5, water_ml=1250, water_goal=2000, jobs_open=6,
+                   follow_company="Monzo", follow_role="Product designer", follow_date=now.date() + timedelta(days=2))
+
+
+def _sample_focus(now: datetime):
+    from .flightdeck import FocusRun
+    t = now.timestamp()
+    return FocusRun("Write the Piholegotchi case study", True, t + 18 * 60, 18 * 60, 25 * 60)
 
 
 def samples(now: datetime) -> dict:
@@ -1105,6 +1308,8 @@ def samples(now: datetime) -> dict:
         "snack": [("doubleclick.net", 1204), ("www.googletagmanager.com", 866), ("graph.facebook.com", 512),
                   ("app-measurement.com", 341), ("ads.tiktok.com", 198)],
         "snack_total": 4812,
+        "deck": _sample_deck(now),
+        "focus": _sample_focus(now),
         "repeat": Top([("Avril 14th", "Aphex Twin"), ("Teardrop", "Massive Attack"), ("Windowlicker", "Aphex Twin"),
                        ("Roygbiv", "Boards of Canada"), ("Kid A", "Radiohead")],
                       ["Aphex Twin", "Boards of Canada", "Radiohead"]),
@@ -1126,6 +1331,10 @@ def draw(name: str, style: str, data: dict, now: datetime) -> Image.Image:
         return render_bins(style, b) if b else render_bins(style, samples(now)["bins"])
     if name == "reminders":
         return render_reminders(style, data.get("reminders") or [], now)
+    if name == "deck":
+        return render_deck(style, data.get("deck"), now)
+    if name == "focus":
+        return render_focus(style, data.get("focus"), now.timestamp(), data.get("focus_done", ""))
     if name == "snack":
         return render_snack(style, data.get("snack") or [], data.get("snack_total") or 0)
     if name == "repeat":

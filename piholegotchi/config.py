@@ -11,8 +11,8 @@ CONFIG_DIR = Path(os.environ.get("PIHOLEGOTCHI_HOME", Path.home() / ".config" / 
 CONFIG_FILE = CONFIG_DIR / "config.json"
 _lock = threading.Lock()
 
-DEFAULT_SCREENS = {"muncher": True, "weather": True, "server": True, "calendar": True, "snack": True, "repeat": True, "bins": True, "reminders": True}
-DEFAULT_STYLES = {"server": "A", "weather": "A", "bins": "A", "reminders": "A", "night": "A", "calendar": "A", "snack": "A", "repeat": "A"}
+DEFAULT_SCREENS = {"muncher": True, "weather": True, "server": True, "calendar": True, "snack": True, "repeat": True, "deck": True, "focus": True, "bins": True, "reminders": True}
+DEFAULT_STYLES = {"server": "A", "weather": "A", "bins": "A", "reminders": "A", "night": "A", "calendar": "A", "snack": "A", "repeat": "A", "deck": "A", "focus": "A"}
 
 
 @dataclass
@@ -34,6 +34,9 @@ class Config:
     # Muncher moods
     muncher_party: bool = True  # dance when today beats the best day so far
     starve_minutes: int = 30    # starving face once blocking's been off this long (0 = never)
+
+    focus_over_music: bool = True   # a Focus session shows even while Spotify plays
+    focus_minutes: int = 25         # the settings page's Start focus
 
     # night mode: one quiet screen, no refreshes, panel asleep
     night: bool = True
