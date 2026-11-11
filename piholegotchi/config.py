@@ -11,8 +11,8 @@ CONFIG_DIR = Path(os.environ.get("PIHOLEGOTCHI_HOME", Path.home() / ".config" / 
 CONFIG_FILE = CONFIG_DIR / "config.json"
 _lock = threading.Lock()
 
-DEFAULT_SCREENS = {"muncher": True, "weather": True, "server": True, "calendar": True, "snack": True, "repeat": True, "deck": True, "focus": True, "bins": True, "reminders": True}
-DEFAULT_STYLES = {"server": "A", "weather": "A", "bins": "A", "reminders": "A", "night": "A", "calendar": "A", "snack": "A", "repeat": "A", "deck": "A", "focus": "A"}
+DEFAULT_SCREENS = {"muncher": True, "weather": True, "server": True, "calendar": True, "snack": True, "repeat": True, "deck": True, "focus": True, "home": True, "message": True, "bins": True, "reminders": True}
+DEFAULT_STYLES = {"server": "A", "weather": "A", "bins": "A", "reminders": "A", "night": "A", "calendar": "A", "snack": "A", "repeat": "A", "deck": "A", "focus": "A", "home": "A", "message": "A"}
 
 
 @dataclass
@@ -54,6 +54,13 @@ class Config:
     calendar_url: str = ""      # a shared ICS link, e.g. Proton Calendar's "Share with anyone"
     calendar_heads_up: int = 15 # cut in this many minutes before an event (0 = never)
 
+    # Home Assistant (on ZimaOS): a long-lived token, and up to five entities for the Home screen
+    ha_url: str = ""            # e.g. http://192.168.1.20:8123
+    ha_token: str = ""
+    ha_entities: list = field(default_factory=list)   # [{"id": "sensor.living_room_temp", "label": "Living room"}]
+    message_minutes: int = 5    # how long a message from HA stays up, if it doesn't say
+    message_over_music: bool = True
+
     # [{"name": "Black", "label": "Waste", "weekday": 3, "every": 1, "from": "2026-11-12"}]
     bins: list = field(default_factory=list)
     # [{"id": "a1b2", "title": "Water the monstera", "kind": "plant", "every": 7,
@@ -85,4 +92,5 @@ class Config:
         """Safe to send to the browser: never includes the password."""
         d = asdict(self)
         d["adguard_password_set"] = bool(d.pop("adguard_password"))
+        d["ha_token_set"] = bool(d.pop("ha_token"))
         return d

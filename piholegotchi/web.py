@@ -24,6 +24,7 @@ from PIL import Image
 from . import schedule, spotify_auth, updater, weather
 from .calendar_feed import CalendarSource, clean_url
 from .adguard import AdGuard
+from .homeassistant import MAX_ENTITIES, HomeAssistant
 from .config import DEFAULT_SCREENS, Config
 from .screens import STYLES, draw, samples
 from .server import Glances
@@ -43,6 +44,17 @@ def _png(img1: Image.Image, scale: int = 4) -> bytes:
     buf = io.BytesIO()
     rgb.resize((img1.width * scale, img1.height * scale), Image.NEAREST).save(buf, "PNG")
     return buf.getvalue()
+
+
+def _local_ip() -> str:
+    """The Pi's address, for Home Assistant (which often can't resolve .local names)."""
+    import socket
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("192.0.2.1", 9))
+            return s.getsockname()[0]
+    except OSError:
+        return ""
 
 
 KINDS = ("plant", "pet", "other")
@@ -130,7 +142,7 @@ def make_handler(state: "State"):
             if path == "/preview.png":
                 q = parse_qs(self.path.partition("?")[2])
                 name, style = q.get("screen", [""])[0], q.get("style", ["A"])[0]
-                if name not in ("server", "weather", "bins", "reminders", "night", "calendar", "snack", "repeat", "deck", "focus") or style not in STYLES:
+                if name not in ("server", "weather", "bins", "reminders", "night", "calendar", "snack", "repeat", "deck", "focus", "home", "message") or style not in STYLES:
                     return self._send(404, b"not found", "text/plain")
                 now = datetime.now()
                 live, fake = dict(state.data), samples(now)
@@ -142,6 +154,10 @@ def make_handler(state: "State"):
                     use["deck"] = fd["deck"]
                 if fd["focus"]:
                     use["focus"] = fd["focus"]
+                if name == "home" and not (use["home"] and use["home"].items):
+                    use["home"] = fake["home"]
+                if name == "message":
+                    use["message"] = state.inbox.now(time.time()) or fake["message"]
                 if name == "snack":
                     with state.lock:
                         s = state.stats
@@ -177,12 +193,15 @@ def make_handler(state: "State"):
                 f, d = fd["focus"], fd["deck"]
                 out["focus"] = None if f is None else {"task": f.task, "running": f.running, "left": f.left(time.time()),
                                                        "total": f.total_s, "source": f.source}
+                m = state.inbox.now(time.time())
+                out["message"] = None if m is None else {"text": m.text, "title": m.title, "left": int(m.until - time.time())}
                 out["deck_sent"] = d.sent.isoformat(timespec="minutes") if d and d.sent else ""
                 out["spotify_connected"] = TOKEN_FILE.exists()
                 try:
                     out["spotify_top"] = "user-top-read" in json.loads(TOKEN_FILE.read_text()).get("scope", "")
                 except (FileNotFoundError, json.JSONDecodeError):
                     out["spotify_top"] = False
+                out["ip"] = _local_ip()
                 out["version"] = updater.installed()[:7]
                 out["update"] = dict(update_status)
                 return self._json(out)
@@ -317,6 +336,60 @@ def make_handler(state: "State"):
                     return self._json({"error": "Unknown action."}, 400)
                 cfg.save()
                 state.refresh_soon()
+                return self._json({"ok": True})
+
+            if path == "/api/message":               # from a Home Assistant automation (or anything)
+                try:
+                    mins = float(body.get("minutes") or cfg.message_minutes)
+                except (TypeError, ValueError):
+                    return self._json({"error": "minutes should be a number."}, 400)
+                state.inbox.post(body.get("message") or body.get("text") or "", body.get("title") or "", mins)
+                state.refresh_soon()
+                return self._json({"ok": True})
+
+            if path == "/api/message/settings":
+                if body.get("minutes") in (1, 2, 5, 10, 15, 30, 60):
+                    cfg.message_minutes = body["minutes"]
+                cfg.message_over_music = bool(body.get("over_music", cfg.message_over_music))
+                cfg.save()
+                return self._json({"ok": True})
+
+            if path == "/api/home":                  # connect Home Assistant; returns what can be shown
+                url = str(body.get("url") or "").strip().rstrip("/")[:300]
+                token = str(body.get("token") or "").strip()[:1000] or cfg.ha_token
+                if not url:
+                    if body.get("save"):
+                        cfg.ha_url, cfg.ha_token, cfg.ha_entities = "", "", []
+                        cfg.save()
+                        state.refresh_soon(stats_too=True)
+                    return self._json({"ok": True, "message": "Home Assistant disconnected.", "entities": []})
+                if not re.match(r"^https?://", url):
+                    url = "http://" + url
+                if not token:
+                    return self._json({"ok": False, "message": "Paste a long-lived access token."})
+                ha = HomeAssistant(url, token)
+                why = ha.check()
+                if why:
+                    return self._json({"ok": False, "message": why})
+                try:
+                    ents = ha.entities()
+                except Exception as e:  # noqa: BLE001
+                    return self._json({"ok": False, "message": f"Connected, but couldn't list things: {e}"})
+                if body.get("save"):
+                    cfg.ha_url, cfg.ha_token = url, token
+                    cfg.save()
+                    state.refresh_soon(stats_too=True)
+                return self._json({"ok": True, "message": f"Connected. {len(ents)} things to pick from.", "entities": ents})
+
+            if path == "/api/home/entities":
+                picks = []
+                for e in (body.get("entities") or [])[:MAX_ENTITIES]:
+                    eid = str(e.get("id") or "").strip()
+                    if re.fullmatch(r"[a-z_]+\.[a-z0-9_]+", eid):
+                        picks.append({"id": eid, "label": str(e.get("label") or "").strip()[:24]})
+                cfg.ha_entities = picks
+                cfg.save()
+                state.refresh_soon(stats_too=True)
                 return self._json({"ok": True})
 
             if path == "/api/calendar":

@@ -11,7 +11,7 @@ from datetime import datetime
 
 from PIL import Image, ImageDraw
 
-from .render import INK, PAPER, W, H, Canvas, fit, fit_size, grot, pix, vt
+from .render import INK, PAPER, W, H, Canvas, fit, fit_size, grot, pix, text_w, vt
 
 STYLES = ("A", "B", "C")
 
@@ -1265,6 +1265,216 @@ def render_focus(style: str, f, now: float, done_task: str = "") -> Image.Image:
     return {"B": focus_b, "C": focus_c}.get(style, focus_a)(f, now)
 
 
+# ---------------------------------------------------------------- home assistant
+
+def _hicon(c: Canvas, kind: str, x, y, s=14, on=None):
+    """A small icon in an s x s box at (x, y)."""
+    d = c.d
+    m = s / 14
+    def P(px, py):
+        return (x + px * m, y + py * m)
+    if kind == "light":
+        d.ellipse([*P(2, 0), *P(12, 10)], fill=INK if on else PAPER, outline=INK, width=2)
+        d.rectangle([*P(4.5, 10), *P(9.5, 13)], fill=INK)
+    elif kind == "lock":
+        d.arc([*P(3, 0), *P(11, 10)], 180, 360, fill=INK, width=2)
+        if on is False:
+            d.rectangle([*P(9, 3), *P(12, 6)], fill=PAPER)
+        d.rectangle([*P(1, 6), *P(13, 14)], fill=INK)
+        d.rectangle([*P(6, 8), *P(8, 11)], fill=PAPER)
+    elif kind == "door":
+        d.rectangle([*P(2, 0), *P(12, 14)], outline=INK, width=2)
+        if on:
+            d.polygon([P(2, 0), P(9, 2), P(9, 14), P(2, 14)], fill=INK)
+        d.rectangle([*P(8, 7), *P(9.5, 8.5)], fill=PAPER if on else INK)
+    elif kind == "motion":
+        d.ellipse([*P(5, 0), *P(9, 4)], fill=INK)
+        d.line([P(7, 4), P(6, 9), P(3, 14)], fill=INK, width=2)
+        d.line([P(6, 9), P(10, 14)], fill=INK, width=2)
+        d.line([P(3, 6), P(11, 6)], fill=INK, width=2)
+    elif kind in ("temp", "climate"):
+        d.rounded_rectangle([*P(5, 0), *P(9, 10)], 2 * m, outline=INK, width=2)
+        d.ellipse([*P(3, 8), *P(11, 14)], fill=INK)
+        d.rectangle([*P(6.5, 4), *P(7.5, 10)], fill=INK)
+    elif kind == "humidity":
+        d.polygon([P(7, 0), P(12, 8), P(2, 8)], fill=INK)
+        d.ellipse([*P(2, 4), *P(12, 14)], fill=INK)
+    elif kind == "power":
+        d.polygon([P(8, 0), P(2, 8), P(7, 8), P(5, 14), P(12, 5), P(7, 5)], fill=INK)
+    elif kind == "battery":
+        d.rectangle([*P(0, 3), *P(12, 11)], outline=INK, width=2)
+        d.rectangle([*P(12, 5), *P(14, 9)], fill=INK)
+        d.rectangle([*P(2, 5), *P(7, 9)], fill=INK)
+    elif kind == "person":
+        d.ellipse([*P(4, 0), *P(10, 6)], fill=INK if on is not False else PAPER, outline=INK, width=2)
+        d.chord([*P(1, 7), *P(13, 21)], 180, 360, fill=INK if on is not False else PAPER, outline=INK, width=2)
+    elif kind == "media":
+        d.polygon([P(3, 1), P(13, 7), P(3, 13)], fill=INK)
+    elif kind == "plug":
+        d.ellipse([*P(0, 0), *P(14, 14)], fill=INK if on else PAPER, outline=INK, width=2)
+        d.line([P(7, 2.5), P(7, 7)], fill=PAPER if on else INK, width=2)
+    else:
+        d.ellipse([*P(4, 4), *P(10, 10)], fill=INK)
+
+
+def _no_home(why: str) -> Image.Image:
+    c = Canvas()
+    d = c.d
+    d.polygon([(20, 56), (55, 24), (90, 56)], fill=INK)            # a little house
+    c.rect(28, 56, 54, 42)
+    c.rect(47, 72, 16, 26, fill=PAPER)
+    d.rectangle([33, 62, 42, 70], fill=PAPER)
+    d.rectangle([68, 62, 77, 70], fill=PAPER)
+    x = 112
+    c.text((x, 24), "HOME", pix())
+    c.text((x - 1, 52), "No home yet", grot(19))
+    c.text((x, 70), "Connect it.", vt(20))
+    c.rect(x, 82, 130, 1)
+    c.text((x, 96), fit(why, 130, pix()), pix())
+    return c.finish()
+
+
+def home_a(h) -> Image.Image:
+    """Tiles: up to four things, a lit tile when it's on."""
+    if h is None or not h.items:
+        return _no_home(h.note if h else "SET IT UP IN SETTINGS")
+    c = Canvas()
+    items = h.items[:4]
+    n = len(items)
+    cols = 1 if n == 1 else 2
+    rows = 1 if n <= 2 else 2
+    tw, th = (242 if cols == 1 else 119), (114 if rows == 1 else 55)
+    for i, it in enumerate(items):
+        x, y = 4 + (i % cols) * (tw + 4), 4 + (i // cols) * (th + 4)
+        lit = bool(it.on)
+        ink = PAPER if lit else INK
+        c.d.rounded_rectangle([x, y, x + tw - 1, y + th - 1], 5, fill=INK if lit else PAPER, outline=INK, width=2)
+        if lit:   # icons draw in ink, so give them a paper chip on a lit tile
+            c.d.rounded_rectangle([x + tw - 25, y + 5, x + tw - 6, y + 24], 4, fill=PAPER)
+        _hicon(c, it.kind, x + tw - 22, y + 8, 13, it.on)
+        c.text((x + 8, y + 14), fit(it.label.upper(), tw - 36, pix()), pix(), fill=ink)
+        big = (30, 26, 22, 18) if rows == 1 else (22, 19, 17, 15)
+        txt, f = fit_size(it.value, tw - 14, big, grot)
+        c.text((x + 7, y + th - 9), txt, f, fill=ink)
+    return c.finish()
+
+
+def home_b(h) -> Image.Image:
+    """List: a row each, icon, name and state."""
+    if h is None or not h.items:
+        return _no_home(h.note if h else "SET IT UP IN SETTINGS")
+    c = Canvas()
+    c.rect(0, 0, W, 20)
+    c.text((8, 14), "HOME", pix(), fill=PAPER)
+    on = sum(1 for it in h.items if it.on)
+    c.text((242, 14), f"{on} ON" if on else "ALL QUIET", pix(), anchor="rs", fill=PAPER)
+    items = h.items[:5]
+    rh = min(24, 100 // len(items))
+    for i, it in enumerate(items):
+        y = 22 + i * rh
+        _hicon(c, it.kind, 8, y + (rh - 13) // 2, 13, it.on)
+        f = grot(17 if rh >= 22 else 15)
+        val_w = text_w(f, it.value)
+        c.text((242, y + rh - 6), fit(it.value, 120, f), f, anchor="rs")
+        c.text((28, y + rh - 7), fit(it.label, 210 - min(120, val_w), vt(20)), vt(20))
+        if i < len(items) - 1:
+            c.rect(28, y + rh, 214, 1)
+    return c.finish()
+
+
+def home_c(h) -> Image.Image:
+    """Big one: the first thing large, the rest along the bottom."""
+    if h is None or not h.items:
+        return _no_home(h.note if h else "SET IT UP IN SETTINGS")
+    c = Canvas()
+    first, rest = h.items[0], h.items[1:4]
+    _hicon(c, first.kind, 8, 8, 18, first.on)
+    c.text((34, 22), fit(first.label.upper(), 208, pix()), pix())
+    txt, f = fit_size(first.value, 234, (46, 40, 34, 28, 22), grot)
+    c.text((5, 70 if rest else 90), txt, f)
+    if rest:
+        c.rect(8, 82, 234, 1)
+        w = 234 // len(rest)
+        for i, it in enumerate(rest):
+            x = 8 + i * w
+            if i:
+                c.rect(x - 4, 88, 1, 30)
+            _hicon(c, it.kind, x, 90, 11, it.on)
+            c.text((x + 15, 100), fit(it.label.upper(), w - 20, pix()), pix())
+            c.text((x, 117), fit(it.value, w - 8, grot(15)), grot(15))
+    return c.finish()
+
+
+def render_home(style: str, h) -> Image.Image:
+    return {"B": home_b, "C": home_c}.get(style, home_a)(h)
+
+
+def _lines(text: str, width: int, font, most: int) -> list[str]:
+    words, out = text.split(), []
+    while words and len(out) < most:
+        ln = ""
+        while words and font.getlength((ln + " " + words[0]).strip()) <= width:
+            ln = (ln + " " + words.pop(0)).strip()
+        if not ln:
+            ln = words.pop(0)
+        out.append(ln)
+    if words:
+        out[-1] = fit(out[-1] + " " + " ".join(words), width, font)
+    return [fit(ln, width, font) for ln in out]
+
+
+def _msg_text(c: Canvas, text: str, x, top, width, bottom):
+    """The biggest size that fits the message in the space."""
+    for size in (26, 22, 19, 17, 15):
+        f = grot(size)
+        gap = size + 3
+        most = max(1, int((bottom - top) // gap))
+        ls = _lines(text, width, f, most)
+        if len(ls) < most or " ".join(ls) == " ".join(text.split()) or size == 15:
+            for i, ln in enumerate(ls):
+                c.text((x, top + size + i * gap), ln, f)
+            return
+
+
+def message_a(m) -> Image.Image:
+    """Bell: a bell on the left, the message beside it."""
+    c = Canvas()
+    bell(c, 14, 10)
+    x = 86
+    c.text((x, 20), (m.title or "HOME ASSISTANT").upper()[:24], pix())
+    c.rect(x, 26, 156, 1)
+    _msg_text(c, m.text, x - 1, 30, 156, 118)
+    return c.finish()
+
+
+def message_b(m) -> Image.Image:
+    """Banner: a bar across the top, the message large."""
+    c = Canvas()
+    c.rect(0, 0, W, 24)
+    c.text((8, 16), (m.title or "MESSAGE").upper()[:30], pix(), fill=PAPER)
+    c.text((242, 16), datetime.now().strftime("%H:%M"), pix(), anchor="rs", fill=PAPER)
+    _msg_text(c, m.text, 6, 28, 238, 120)
+    return c.finish()
+
+
+def message_c(m) -> Image.Image:
+    """Muncher: it holds up a sign with your message."""
+    from .render import _creature
+    c = Canvas()
+    _creature(c, "content")
+    d = c.d
+    d.rounded_rectangle([104, 6, 244, 116], 8, fill=PAPER, outline=INK, width=2)
+    d.polygon([(104, 62), (86, 70), (104, 76)], fill=INK)       # speech-bubble tail
+    d.line([(104, 64), (104, 74)], fill=PAPER, width=1)
+    c.text((114, 22), (m.title or "PSST").upper()[:18], pix())
+    _msg_text(c, m.text, 113, 26, 122, 112)
+    return c.finish()
+
+
+def render_message(style: str, m) -> Image.Image:
+    return {"B": message_b, "C": message_c}.get(style, message_a)(m)
+
+
 # ================================================================ samples (for the picker before things are set up)
 
 def _sample_events(now: datetime) -> list:
@@ -1292,6 +1502,18 @@ def _sample_focus(now: datetime):
     return FocusRun("Write the Piholegotchi case study", True, t + 18 * 60, 18 * 60, 25 * 60)
 
 
+def _sample_home():
+    from .homeassistant import Home, Item
+    return Home([Item("Living room", "21.5°", "temp"), Item("Front door", "LOCKED", "lock", True),
+                 Item("Desk lamp", "ON", "light", True), Item("Washing", "412 W", "power"),
+                 Item("Sam", "AWAY", "person", False)])
+
+
+def _sample_message(now: datetime):
+    from .homeassistant import Message
+    return Message("The washing's done. Hang it out before it gets crumpled.", "Utility room", now.timestamp() + 300)
+
+
 def samples(now: datetime) -> dict:
     from datetime import timedelta
     return {
@@ -1310,6 +1532,8 @@ def samples(now: datetime) -> dict:
         "snack_total": 4812,
         "deck": _sample_deck(now),
         "focus": _sample_focus(now),
+        "home": _sample_home(),
+        "message": _sample_message(now),
         "repeat": Top([("Avril 14th", "Aphex Twin"), ("Teardrop", "Massive Attack"), ("Windowlicker", "Aphex Twin"),
                        ("Roygbiv", "Boards of Canada"), ("Kid A", "Radiohead")],
                       ["Aphex Twin", "Boards of Canada", "Radiohead"]),
@@ -1342,6 +1566,11 @@ def draw(name: str, style: str, data: dict, now: datetime) -> Image.Image:
     if name == "calendar":
         cal = data.get("calendar")
         return render_calendar(style, cal if cal is not None else [], now)
+    if name == "home":
+        return render_home(style, data.get("home"))
+    if name == "message":
+        m = data.get("message")
+        return render_message(style, m if m else samples(now)["message"])
     if name == "night":
         n = data.get("night") or {}
         return render_night(style, n.get("blocked"), n.get("until", "07:00"))

@@ -105,6 +105,14 @@ select{font:15px var(--sans);color:var(--fg);background:var(--bg);border:1px sol
 .item .status b{color:var(--fg);font-weight:500}
 .item .status .due{color:var(--bad)}
 button.x{padding:8px 10px;color:var(--muted)}
+section h3{font:600 16px var(--sans);margin:22px 0 6px}
+.ents{display:grid;gap:6px;max-height:320px;overflow:auto;padding:4px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.ent{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,9em);gap:10px;align-items:center;padding:6px 8px;border-radius:8px}
+.ent:has(input:checked){background:var(--surface)}
+.ent small{display:block;color:var(--muted);font:12px var(--mono);overflow-wrap:anywhere}
+.ent input[type=text]{padding:6px 8px;font-size:14px;width:100%}
+pre.yaml{font:12.5px/1.5 var(--mono);background:var(--bg);border:1px dashed var(--line);border-radius:8px;padding:10px 12px;overflow:auto;margin:0;white-space:pre}
+@media (max-width:600px){.ent{grid-template-columns:auto minmax(0,1fr)}.ent input[type=text]{grid-column:2}}
 @media (max-width:600px){.item,.item.rem{grid-template-columns:1fr 1fr}.item .field.wide{grid-column:1/-1}}
 [hidden]{display:none!important}
 @media (max-width:520px){.device{padding:9px 9px 6px;border-radius:10px}.glass{padding:4px}}
@@ -337,6 +345,50 @@ button.x{padding:8px 10px;color:var(--muted)}
     </div>
     <p class="msg" id="up-msg" role="status"></p>
   </section>
+  <section aria-labelledby="ha-h">
+    <div class="sechead"><h2 id="ha-h">Home Assistant</h2><span id="ha-pill" class="pill off">Not set up</span></div>
+    <p class="lead">Show a few things from your home on the Home screen, and let Home Assistant put messages on the screen.</p>
+    <ol class="steps">
+      <li><div><p>In Home Assistant, click your name at the bottom left, open the <b>Security</b> tab, and under <b>Long-lived access tokens</b> choose <b>Create token</b>. Call it Piholegotchi and copy it.</p></div></li>
+      <li><div class="field">
+        <label for="ha-url">Home Assistant's address</label>
+        <input id="ha-url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://192.168.1.20:8123">
+        <span class="hint">The address you open Home Assistant on, usually your ZimaOS server's address with :8123 on the end.</span>
+      </div></li>
+      <li><div class="field">
+        <label for="ha-token">Access token</label>
+        <input id="ha-token" type="password" autocomplete="off" spellcheck="false">
+        <span class="hint">Kept on the Pi and never shown again.</span>
+        <div class="row"><button class="primary" id="ha-save" type="button">Connect</button><button id="ha-off" type="button" hidden>Disconnect</button></div>
+      </div></li>
+    </ol>
+    <p class="msg" id="ha-msg" role="status"></p>
+    <div id="ha-pick" hidden>
+      <div class="field"><label for="ha-find">Pick up to five things to show</label>
+        <input id="ha-find" type="search" placeholder="Search, e.g. temperature, door, lamp" autocomplete="off">
+        <span class="hint">The first one is the big one in the Big one style. Give them short names so they fit.</span></div>
+      <div class="ents" id="ha-ents" role="group" aria-label="Things to show"></div>
+      <div class="row"><button class="primary" id="ha-pick-save" type="button">Save picks</button><span class="hint" id="ha-count"></span></div>
+      <p class="msg" id="ha-pick-msg" role="status"></p>
+    </div>
+
+    <h3>Messages from Home Assistant</h3>
+    <p class="lead">Add this to Home Assistant's <code>configuration.yaml</code> and restart it. Then any automation can use the <b>rest_command.piholegotchi</b> action, for example when the washing's done.</p>
+    <pre class="yaml" id="ha-yaml"></pre>
+    <div class="grid2">
+      <div class="field"><label for="ms-mins">A message stays up for</label>
+        <select id="ms-mins"><option value="1">1 minute</option><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option></select>
+        <span class="hint">Unless the automation sends its own <code>minutes</code>.</span></div>
+      <div class="field"><label for="ms-test">Try one</label>
+        <input id="ms-test" maxlength="140" placeholder="The washing's done"></div>
+    </div>
+    <div class="row"><button type="button" id="ms-send">Send to the screen</button><button type="button" id="ms-clear" hidden>Clear message</button></div>
+    <label class="switch" for="ms-music">
+      <input type="checkbox" id="ms-music" role="switch">
+      <span><b>Show over music</b><br><span class="hint">A message replaces Sleeve while it's up.</span></span>
+    </label>
+    <p class="msg" id="ms-msg" role="status"></p>
+  </section>
 
   <footer>Piholegotchi runs on this Pi. Settings are saved on the Pi only.</footer>
 </div>
@@ -359,7 +411,7 @@ async function poll(){
   try{
     const s = await api('/api/state');
     if (s.frame !== lastFrame){ lastFrame = s.frame; $('screen').src = '/screen.png?f=' + s.frame; }
-    const what = {sleeve:'Sleeve', muncher:'Muncher', setup:'the setup screen', weather:'Weather', server:'Server health', bins:'Bin day', reminders:'Reminders'}[s.screen] || 'Starting';
+    const what = {sleeve:'Sleeve', muncher:'Muncher', setup:'the setup screen', weather:'Weather', server:'Server health', bins:'Bin day', reminders:'Reminders', night:'Night mode', calendar:'Calendar', snack:'Biggest snack', repeat:'On repeat', deck:'Flight Deck', focus:'Focus', home:'Home', message:'a message'}[s.screen] || 'Starting';
     $('now').innerHTML = '';
     const b = document.createElement('b'); b.textContent = 'Showing ' + what;
     $('now').append(b, document.createTextNode((s.detail ? ' · ' + s.detail : '') + ' · updated ' + ago(s.now - s.updated)));
@@ -388,6 +440,10 @@ async function poll(){
     $('rm-pill').textContent = cfg.reminders.length ? (dueN ? dueN + ' due' : 'All done') : 'None yet';
     $('rm-pill').className = 'pill ' + (cfg.reminders.length ? 'on' : 'off');
     remState = s.reminders || {}; paintRemStatus();
+    $('ha-pill').textContent = cfg.ha_url ? (cfg.ha_entities.length ? cfg.ha_entities.length + ' things' : 'Connected') : 'Not set up';
+    $('ha-pill').className = 'pill ' + (cfg.ha_url ? 'on' : 'off'); $('ha-off').hidden = !cfg.ha_url;
+    $('ha-token').placeholder = cfg.ha_token_set ? 'Saved. Leave blank to keep it' : '';
+    $('ms-clear').hidden = !s.message;
     $('nt-pill').textContent = cfg.night ? cfg.night_from + '–' + cfg.night_to : 'Off';
     $('nt-pill').className = 'pill ' + (cfg.night ? 'on' : 'off');
     if (!loaded){
@@ -402,6 +458,10 @@ async function poll(){
       cfg.reminders.forEach(addRem); paintRemStatus();
       $('flip').checked = !!cfg.flip;
       buildNight(cfg);
+      if (s.ip) paintYaml(s.ip + (location.port ? ':' + location.port : ''));
+      $('ha-url').value = cfg.ha_url || ''; haPicks = cfg.ha_entities.map(e => ({...e}));
+      $('ms-mins').value = String(cfg.message_minutes || 5); $('ms-music').checked = !!cfg.message_over_music;
+      if (cfg.ha_url) homeConnect(false, true);
       $('pz-mins').value = String(cfg.pause_minutes || 5); pzLabel();
       $('fc-mins').value = String(cfg.focus_minutes || 25); $('fc-music').checked = !!cfg.focus_over_music;
       $('mu-party').checked = !!cfg.muncher_party; $('mu-starve').value = String(cfg.starve_minutes);
@@ -465,6 +525,8 @@ const SCREENS = [
   {id:'snack', name:'Biggest snack', hint:'The domain AdGuard blocked most today.', styles:['Plate','Menu','Receipt']},
   {id:'repeat', name:'On repeat', hint:'Your most played on Spotify over the last four weeks.', styles:['Cover','Top 5','Artist']},
   {id:'calendar', name:'Calendar', styles:['Up next','Agenda','Countdown']},
+  {id:'home', name:'Home', hint:'Things from Home Assistant. Pick them below.', styles:['Tiles','List','Big one']},
+  {id:'message', name:'Messages', hint:'Takes over while Home Assistant has something to tell you.', styles:['Bell','Banner','Muncher']},
   {id:'bins', name:'Bin day', styles:['Bin buddy','Calendar','Loud']},
   {id:'reminders', name:'Plants and pets', styles:['Thirsty plant','Checklist','Sticky note']},
 ];
@@ -615,6 +677,81 @@ async function calendar(save){
 $('cl-save').addEventListener('click', () => calendar(true));
 $('cl-test').addEventListener('click', () => calendar(false));
 $('cl-heads').addEventListener('change', () => calendar(true));
+
+/* Home Assistant */
+let haPicks = [], haEnts = [];
+function paintYaml(host){ $('ha-yaml').textContent = `rest_command:
+  piholegotchi:
+    url: http://${host}/api/message
+    method: POST
+    content_type: application/json
+    payload: '{{ {"message": message, "title": title | default(""), "minutes": minutes | default(0)} | to_json }}'
+
+# then in an automation's actions:
+#   - action: rest_command.piholegotchi
+#     data:
+#       title: Utility room
+#       message: The washing's done`; }
+paintYaml(location.host);
+async function homeConnect(save, quiet){
+  if (!quiet) say($('ha-msg'), save ? 'Connecting…' : 'Checking…', true);
+  try{
+    const r = await api('/api/home', {url: $('ha-url').value, token: $('ha-token').value, save});
+    if (!quiet || !r.ok) say($('ha-msg'), r.message, r.ok);
+    if (r.ok && r.entities.length){ haEnts = r.entities; $('ha-pick').hidden = false; paintEnts(); }
+    if (!r.entities || !r.entities.length) $('ha-pick').hidden = true;
+    if (save){ $('ha-token').value = ''; poll(); }
+  }catch(e){ say($('ha-msg'), e.message); }
+}
+function paintEnts(){
+  const q = $('ha-find').value.trim().toLowerCase(), box = $('ha-ents'); box.innerHTML = '';
+  const picked = new Set(haPicks.map(p => p.id));
+  const list = [...haPicks.map(p => haEnts.find(e => e.id === p.id) || {id: p.id, name: p.id, value: ''}),
+                ...haEnts.filter(e => !picked.has(e.id) && (!q || (e.name + ' ' + e.id).toLowerCase().includes(q))).slice(0, 80)];
+  list.forEach((e, i) => {
+    const pick = haPicks.find(p => p.id === e.id);
+    const row = document.createElement('label'); row.className = 'ent';
+    row.innerHTML = `<input type="checkbox"><span><span class="n"></span><small></small></span><input type="text" maxlength="24" placeholder="Short name">`;
+    const [cb, , name] = [row.querySelector('input[type=checkbox]'), 0, row.querySelector('input[type=text]')];
+    row.querySelector('.n').textContent = e.name; row.querySelector('small').textContent = e.id + (e.value ? ' · ' + e.value : '');
+    cb.checked = !!pick; name.hidden = !pick; name.value = pick ? pick.label : '';
+    cb.addEventListener('change', () => {
+      if (cb.checked){
+        if (haPicks.length >= 5){ cb.checked = false; say($('ha-pick-msg'), 'Five is the most that fits. Untick one first.'); return; }
+        haPicks.push({id: e.id, label: e.name.slice(0, 24)});
+      } else haPicks = haPicks.filter(p => p.id !== e.id);
+      say($('ha-pick-msg'), ''); paintEnts();
+    });
+    name.addEventListener('input', () => { const p = haPicks.find(p => p.id === e.id); if (p) p.label = name.value; });
+    box.append(row);
+  });
+  $('ha-count').textContent = haPicks.length + ' of 5 picked';
+}
+$('ha-find').addEventListener('input', paintEnts);
+$('ha-save').addEventListener('click', () => homeConnect(true));
+$('ha-off').addEventListener('click', async () => {
+  try{ await api('/api/home', {url: '', save: true}); $('ha-url').value = ''; haPicks = []; $('ha-pick').hidden = true; say($('ha-msg'), 'Disconnected.', true); poll(); }
+  catch(e){ say($('ha-msg'), e.message); }
+});
+$('ha-pick-save').addEventListener('click', async () => {
+  try{ await api('/api/home/entities', {entities: haPicks}); say($('ha-pick-msg'), 'Saved. The Home screen updates in a minute.', true); setTimeout(() => { poll(); refreshThumbs(); }, 3000); }
+  catch(e){ say($('ha-pick-msg'), e.message); }
+});
+$('ms-send').addEventListener('click', async () => {
+  const text = $('ms-test').value.trim() || "The washing's done";
+  try{ await api('/api/message', {message: text, title: 'Test'}); say($('ms-msg'), 'Sent. It shows on the screen now.', true); setTimeout(poll, 2500); }
+  catch(e){ say($('ms-msg'), e.message); }
+});
+$('ms-clear').addEventListener('click', async () => {
+  try{ await api('/api/message', {message: ''}); say($('ms-msg'), 'Cleared.', true); setTimeout(poll, 2500); }
+  catch(e){ say($('ms-msg'), e.message); }
+});
+async function msgSettings(){
+  try{ await api('/api/message/settings', {minutes: Number($('ms-mins').value), over_music: $('ms-music').checked}); say($('ms-msg'), 'Saved.', true); }
+  catch(e){ say($('ms-msg'), e.message); }
+}
+$('ms-mins').addEventListener('change', msgSettings);
+$('ms-music').addEventListener('change', msgSettings);
 
 /* Bins */
 let rowN = 0;
