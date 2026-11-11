@@ -105,6 +105,13 @@ select{font:15px var(--sans);color:var(--fg);background:var(--bg);border:1px sol
 .item .status b{color:var(--fg);font-weight:500}
 .item .status .due{color:var(--bad)}
 button.x{padding:8px 10px;color:var(--muted)}
+.tabs{position:sticky;top:0;z-index:5;display:flex;gap:4px;padding:6px;margin:0 -6px;background:var(--bg);border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{border:0;background:transparent;color:var(--muted);padding:8px 14px;border-radius:8px;white-space:nowrap}
+.tabs button[aria-selected=true]{background:var(--surface);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line)}
+section.tab-off{display:none}
+.scr .more{font-size:13px;color:var(--accent);text-decoration:none;justify-self:start}
+.scr .more:hover{text-decoration:underline}
 section h3{font:600 16px var(--sans);margin:22px 0 6px}
 .ents{display:grid;gap:6px;max-height:320px;overflow:auto;padding:4px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
 .ent{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,9em);gap:10px;align-items:center;padding:6px 8px;border-radius:8px}
@@ -138,7 +145,14 @@ pre.yaml{font:12.5px/1.5 var(--mono);background:var(--bg);border:1px dashed var(
     <button class="quiet" id="refresh" type="button">Refresh screen</button>
   </div>
 
-  <section aria-labelledby="fc-h">
+  <nav class="tabs" role="tablist" aria-label="Settings">
+    <button type="button" role="tab" data-go="today">Today</button>
+    <button type="button" role="tab" data-go="screens">Screens</button>
+    <button type="button" role="tab" data-go="connect">Connections</button>
+    <button type="button" role="tab" data-go="device">Device</button>
+  </nav>
+
+  <section data-tab="today" aria-labelledby="fc-h">
     <div class="sechead"><h2 id="fc-h">Focus</h2><span id="fc-pill" class="pill off">Off</span></div>
     <p class="lead" id="fc-text">Start a session and the screen counts it down. Sessions you start in Flight Deck show here too.</p>
     <div class="grid2" id="fc-new">
@@ -158,7 +172,7 @@ pre.yaml{font:12.5px/1.5 var(--mono);background:var(--bg);border:1px dashed var(
     <p class="msg" id="fc-msg" role="status"></p>
   </section>
 
-  <section aria-labelledby="pz-h" id="pz" hidden>
+  <section data-tab="today" aria-labelledby="pz-h" id="pz" hidden>
     <div class="sechead"><h2 id="pz-h">Ad blocking</h2><span id="pz-pill" class="pill on">On</span></div>
     <p class="lead" id="pz-text">Need to get past a blocked link? Pause it for a bit. It comes back on by itself.</p>
     <div class="row">
@@ -169,7 +183,7 @@ pre.yaml{font:12.5px/1.5 var(--mono);background:var(--bg);border:1px dashed var(
     <p class="msg" id="pz-msg" role="status"></p>
   </section>
 
-  <section aria-labelledby="sp-h">
+  <section data-tab="connect" aria-labelledby="sp-h">
     <div class="sechead"><h2 id="sp-h">Spotify</h2><span id="sp-pill" class="pill off">Not connected</span></div>
 
     <div id="sp-connected" hidden>
@@ -201,7 +215,7 @@ pre.yaml{font:12.5px/1.5 var(--mono);background:var(--bg);border:1px dashed var(
     <p class="msg" id="sp-msg" role="status"></p>
   </section>
 
-  <section aria-labelledby="ag-h">
+  <section data-tab="connect" aria-labelledby="ag-h">
     <div class="sechead"><h2 id="ag-h">AdGuard Home</h2><span id="ag-pill" class="pill off">Not set up</span></div>
     <form id="ag-form" class="steps" style="display:grid;gap:14px">
       <div class="field">
@@ -220,7 +234,7 @@ pre.yaml{font:12.5px/1.5 var(--mono);background:var(--bg);border:1px dashed var(
     </form>
   </section>
 
-  <section aria-labelledby="sc-h">
+  <section data-tab="screens" aria-labelledby="sc-h">
     <div class="sechead"><h2 id="sc-h">Screens</h2></div>
     <p class="lead">When nothing's playing, these take turns. Bins and reminders only join in when something’s due, and Calendar takes over just before an event. Tap a style to pick it.</p>
     <div class="picker" id="picker"></div>
@@ -235,14 +249,10 @@ pre.yaml{font:12.5px/1.5 var(--mono);background:var(--bg);border:1px dashed var(
       <label><input type="radio" name="music" value="nudges" id="mm-nudges"><span><b>Sleeve, with bins and reminders cutting in.</b> <span class="hint">For a minute, at most every 10 minutes.</span></span></label>
       <label><input type="radio" name="music" value="rotate" id="mm-rotate"><span><b>Take turns with everything.</b> <span class="hint">Sleeve joins the rotation.</span></span></label>
     </fieldset>
-    <label class="switch" for="flip">
-      <input type="checkbox" id="flip" role="switch">
-      <span><b>Flip upside down</b><br><span class="hint">For when the Pi is mounted with the cable on top.</span></span>
-    </label>
     <p class="msg" id="sc-msg" role="status"></p>
   </section>
 
-  <section aria-labelledby="mm-h">
+  <section data-tab="screens" aria-labelledby="mm-h">
     <div class="sechead"><h2 id="mm-h">Muncher moods</h2></div>
     <label class="switch" for="mu-party">
       <input type="checkbox" id="mu-party" role="switch">
@@ -256,7 +266,7 @@ pre.yaml{font:12.5px/1.5 var(--mono);background:var(--bg);border:1px dashed var(
     <p class="msg" id="mu-msg" role="status"></p>
   </section>
 
-  <section aria-labelledby="nt-h">
+  <section data-tab="screens" aria-labelledby="nt-h">
     <div class="sechead"><h2 id="nt-h">Night mode</h2><span id="nt-pill" class="pill off">Off</span></div>
     <p class="lead">One quiet screen overnight. The e-ink is left alone and powered down until morning.</p>
     <label class="switch" for="nt-on">
@@ -275,7 +285,7 @@ pre.yaml{font:12.5px/1.5 var(--mono);background:var(--bg);border:1px dashed var(
     <p class="msg" id="nt-msg" role="status"></p>
   </section>
 
-  <section aria-labelledby="wx-h">
+  <section data-tab="connect" aria-labelledby="wx-h">
     <div class="sechead"><h2 id="wx-h">Weather</h2><span id="wx-pill" class="pill off">Not set up</span></div>
     <form id="wx-form" style="display:grid;gap:12px">
       <div class="field"><label for="wx-place">Your town or city</label>
@@ -286,7 +296,7 @@ pre.yaml{font:12.5px/1.5 var(--mono);background:var(--bg);border:1px dashed var(
     <p class="hint" style="margin:0">Forecasts from Open-Meteo. Free, no account.</p>
   </section>
 
-  <section aria-labelledby="sv-h">
+  <section data-tab="connect" aria-labelledby="sv-h">
     <div class="sechead"><h2 id="sv-h">Server health</h2><span id="sv-pill" class="pill off">Not set up</span></div>
     <ol class="steps">
       <li><div><p>On your ZimaOS dashboard, open the <b>App Store</b>, find <b>Glances</b> and install it.</p></div></li>
@@ -300,7 +310,7 @@ pre.yaml{font:12.5px/1.5 var(--mono);background:var(--bg);border:1px dashed var(
     <p class="msg" id="sv-msg" role="status"></p>
   </section>
 
-  <section aria-labelledby="cl-h">
+  <section data-tab="connect" aria-labelledby="cl-h">
     <div class="sechead"><h2 id="cl-h">Calendar</h2><span id="cl-pill" class="pill off">Not set up</span></div>
     <ol class="steps">
       <li><div><p>In Proton Calendar on the web, go to <b>Settings</b>, <b>All settings</b>, <b>Calendars</b> and pick your calendar.</p></div></li>
@@ -320,7 +330,7 @@ pre.yaml{font:12.5px/1.5 var(--mono);background:var(--bg);border:1px dashed var(
     <p class="msg" id="cl-msg" role="status"></p>
   </section>
 
-  <section aria-labelledby="bn-h">
+  <section data-tab="today" aria-labelledby="bn-h">
     <div class="sechead"><h2 id="bn-h">Bin day</h2><span id="bn-pill" class="pill off">No bins</span></div>
     <p class="lead">Shows from 4pm the day before until 10am on the day.</p>
     <div class="list" id="bins"></div>
@@ -328,7 +338,7 @@ pre.yaml{font:12.5px/1.5 var(--mono);background:var(--bg);border:1px dashed var(
     <p class="msg" id="bn-msg" role="status"></p>
   </section>
 
-  <section aria-labelledby="rm-h">
+  <section data-tab="today" aria-labelledby="rm-h">
     <div class="sechead"><h2 id="rm-h">Plants and pets</h2><span id="rm-pill" class="pill off">None yet</span></div>
     <p class="lead">Reminders show when they're due. Tap Done here when you've done it.</p>
     <div class="list" id="rems"></div>
@@ -336,7 +346,15 @@ pre.yaml{font:12.5px/1.5 var(--mono);background:var(--bg);border:1px dashed var(
     <p class="msg" id="rm-msg" role="status"></p>
   </section>
 
-  <section aria-labelledby="up-h">
+  <section data-tab="device" aria-labelledby="dv-h">
+    <div class="sechead"><h2 id="dv-h">Screen</h2></div>
+    <label class="switch" for="flip">
+      <input type="checkbox" id="flip" role="switch">
+      <span><b>Flip upside down</b><br><span class="hint">For when the Pi is mounted with the cable on top.</span></span>
+    </label>
+  </section>
+
+  <section data-tab="device" aria-labelledby="up-h">
     <div class="sechead"><h2 id="up-h">Software</h2><span id="ver" class="pill off">…</span></div>
     <p class="lead" id="up-text">Get the latest Piholegotchi from GitHub. Your settings are kept.</p>
     <div class="row">
@@ -345,7 +363,7 @@ pre.yaml{font:12.5px/1.5 var(--mono);background:var(--bg);border:1px dashed var(
     </div>
     <p class="msg" id="up-msg" role="status"></p>
   </section>
-  <section aria-labelledby="ha-h">
+  <section data-tab="connect" aria-labelledby="ha-h">
     <div class="sechead"><h2 id="ha-h">Home Assistant</h2><span id="ha-pill" class="pill off">Not set up</span></div>
     <p class="lead">Show a few things from your home on the Home screen, and let Home Assistant put messages on the screen.</p>
     <ol class="steps">
@@ -473,6 +491,27 @@ async function poll(){
   }catch(e){ $('now').textContent = 'Can’t reach the Pi right now.'; $('live').classList.add('stale'); }
 }
 
+/* Tabs */
+const TABS = ['today','screens','connect','device'];
+function showTab(t, scrollTo){
+  if (!TABS.includes(t)) t = 'today';
+  document.querySelectorAll('section[data-tab]').forEach(s => s.classList.toggle('tab-off', s.dataset.tab !== t));
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.go === t)));
+  try{ localStorage.setItem('tab', t); }catch(e){}
+  if (scrollTo){ const el = document.getElementById(scrollTo); if (el) setTimeout(() => el.scrollIntoView({behavior:'smooth', block:'start'}), 30); }
+}
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => { history.replaceState(null, '', '#' + b.dataset.go); showTab(b.dataset.go); }));
+function fromHash(){
+  const h = location.hash.slice(1);
+  if (!h) return false;
+  if (TABS.includes(h)){ showTab(h); return true; }
+  const el = document.getElementById(h), sec = el && el.closest('section[data-tab]');
+  if (sec){ showTab(sec.dataset.tab, h); return true; }
+  return false;
+}
+window.addEventListener('hashchange', fromHash);
+if (!fromHash()){ let t = 'today'; try{ t = localStorage.getItem('tab') || t; }catch(e){} showTab(t); }
+
 /* Spotify */
 let reconnecting = false;
 $('sp-reconnect').addEventListener('click', () => { reconnecting = true; $('sp-setup').hidden = false; $('sp-start').focus(); });
@@ -517,18 +556,18 @@ $('flip').addEventListener('change', async () => {
 
 /* Screens picker */
 const SCREENS = [
-  {id:'muncher', name:'Muncher', hint:'Ad-blocking stats from AdGuard.'},
-  {id:'weather', name:'Weather and clock', styles:['Big clock','Forecast strip','Window']},
-  {id:'server', name:'Server health', styles:['Box face','Gauges','Panic mode']},
+  {id:'muncher', set:'ag-h', setText:'AdGuard connection →', name:'Muncher', hint:'Ad-blocking stats from AdGuard.'},
+  {id:'weather', set:'wx-h', name:'Weather and clock', styles:['Big clock','Forecast strip','Window']},
+  {id:'server', set:'sv-h', name:'Server health', styles:['Box face','Gauges','Panic mode']},
   {id:'deck', name:'Flight Deck', hint:'Your day from the Flight Deck app. Turn it on in the app under Settings › Piholegotchi.', styles:['Next step','Tiles','Job hunt']},
-  {id:'focus', name:'Focus', hint:'Takes over while a Focus session runs, from the app or below.', styles:['Ring','Bar','Muncher']},
-  {id:'snack', name:'Biggest snack', hint:'The domain AdGuard blocked most today.', styles:['Plate','Menu','Receipt']},
-  {id:'repeat', name:'On repeat', hint:'Your most played on Spotify over the last four weeks.', styles:['Cover','Top 5','Artist']},
-  {id:'calendar', name:'Calendar', styles:['Up next','Agenda','Countdown']},
-  {id:'home', name:'Home', hint:'Things from Home Assistant. Pick them below.', styles:['Tiles','List','Big one']},
-  {id:'message', name:'Messages', hint:'Takes over while Home Assistant has something to tell you.', styles:['Bell','Banner','Muncher']},
-  {id:'bins', name:'Bin day', styles:['Bin buddy','Calendar','Loud']},
-  {id:'reminders', name:'Plants and pets', styles:['Thirsty plant','Checklist','Sticky note']},
+  {id:'focus', set:'fc-h', setText:'Start a focus session →', name:'Focus', hint:'Takes over while a Focus session runs, from Flight Deck or the Today tab.', styles:['Ring','Bar','Muncher']},
+  {id:'snack', set:'ag-h', setText:'AdGuard connection →', name:'Biggest snack', hint:'The domain AdGuard blocked most today.', styles:['Plate','Menu','Receipt']},
+  {id:'repeat', set:'sp-h', setText:'Spotify connection →', name:'On repeat', hint:'Your most played on Spotify over the last four weeks.', styles:['Cover','Top 5','Artist']},
+  {id:'calendar', set:'cl-h', name:'Calendar', styles:['Up next','Agenda','Countdown']},
+  {id:'home', set:'ha-h', setText:'Pick what to show →', name:'Home', hint:'Things from Home Assistant.', styles:['Tiles','List','Big one']},
+  {id:'message', set:'ha-h', setText:'Message settings →', name:'Messages', hint:'Takes over while Home Assistant has something to tell you.', styles:['Bell','Banner','Muncher']},
+  {id:'bins', set:'bn-h', setText:'Your bins →', name:'Bin day', styles:['Bin buddy','Calendar','Loud']},
+  {id:'reminders', set:'rm-h', setText:'Your plants and pets →', name:'Plants and pets', styles:['Thirsty plant','Checklist','Sticky note']},
 ];
 function buildPicker(cfg){
   const box = $('picker'); box.innerHTML = '';
@@ -539,6 +578,11 @@ function buildPicker(cfg){
     wrap.innerHTML = `<label class="switch" for="on-${sc.id}"><input type="checkbox" id="on-${sc.id}" role="switch"><span><b>${sc.name}</b>${sc.hint ? '<br><span class="hint">' + sc.hint + '</span>' : ''}</span></label>`;
     const sw = wrap.querySelector('input'); sw.checked = on;
     sw.addEventListener('change', () => { wrap.classList.toggle('off', !sw.checked); saveRotation({screens: {[sc.id]: sw.checked}}); });
+    if (sc.set){
+      const a = document.createElement('a'); a.className = 'more'; a.href = '#' + sc.set;
+      a.textContent = sc.setText || 'Settings for ' + sc.name + ' →';
+      wrap.append(a);
+    }
     if (sc.styles){
       const st = document.createElement('div'); st.className = 'styles'; st.setAttribute('role', 'radiogroup'); st.setAttribute('aria-label', sc.name + ' style');
       ['A','B','C'].forEach((k, i) => {
