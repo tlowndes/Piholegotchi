@@ -2,7 +2,7 @@
 # Builds a Raspberry Pi OS Lite image with Piholegotchi pre-installed.
 # Runs on an x86 Linux machine with root (GitHub Actions does this for us):
 #
-#   sudo apt-get install -y qemu-user-static binfmt-support parted xz-utils e2fsprogs
+#   sudo apt-get install -y qemu-user-binfmt parted xz-utils e2fsprogs
 #   sudo image/build.sh            # -> out/piholegotchi.img.xz
 set -euo pipefail
 
