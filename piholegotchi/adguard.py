@@ -35,6 +35,11 @@ class AdGuard:
                       + s.get("num_replaced_safebrowsing", 0)
                       + s.get("num_replaced_parental", 0))
         pct = blocked / total * 100 if total else 0.0
+        top = []
+        for d in (s.get("top_blocked_domains") or [])[:5]:
+            if isinstance(d, dict) and d:
+                (name, n), = list(d.items())[:1]
+                top.append((str(name), int(n)))
         today = None
         hours = s.get("blocked_filtering")
         if isinstance(hours, list) and hours:
@@ -46,10 +51,10 @@ class AdGuard:
         if not status.get("protection_enabled", True):
             left = int(status.get("protection_disabled_duration") or 0) / 1000   # ms left on a pause
             if left > 0:
-                return Stats(total, blocked, pct, online=False, note="BLOCKING PAUSED", today=today,
+                return Stats(total, blocked, pct, online=False, note="BLOCKING PAUSED", today=today, top=top,
                              paused_until=time.time() + left)
-            return Stats(total, blocked, pct, online=False, note="BLOCKING IS OFF", today=today)
-        return Stats(total, blocked, pct, today=today)
+            return Stats(total, blocked, pct, online=False, note="BLOCKING IS OFF", today=today, top=top)
+        return Stats(total, blocked, pct, today=today, top=top)
 
     def protect(self, on: bool, minutes: int = 0):
         """Turn blocking on, or off (for `minutes`, then AdGuard turns it back on by itself)."""

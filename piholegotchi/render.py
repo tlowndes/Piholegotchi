@@ -7,7 +7,7 @@ in afterwards so its texture survives.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
@@ -145,6 +145,7 @@ class Stats:
     off_mins: int = 0       # starving: how long blocking has been off
     frame: int = 0          # party: which dance pose
     paused_until: float = 0.0   # blocking paused until this time (epoch seconds)
+    top: list = field(default_factory=list)   # [(domain, times blocked)], most first
 
 
 def mmss(s: int) -> str:
@@ -163,7 +164,7 @@ ART = 106
 
 def placeholder_art() -> Image.Image:
     """Shown when a track has no cover: a quiet diagonal hatch."""
-    im = Image.new("1", (ART, ART), 1)
+    im = Image.new("1", (ART, ART), 255)
     d = ImageDraw.Draw(im)
     for i in range(-ART, ART, 6):
         d.line([(i, ART), (i + ART, 0)], fill=0)

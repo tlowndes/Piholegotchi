@@ -22,7 +22,7 @@ from .config import Config
 from .spotify import TOKEN_FILE, TOKEN_URL
 
 REDIRECT = "http://127.0.0.1:8888/callback"
-SCOPE = "user-read-currently-playing user-read-playback-state"
+SCOPE = "user-read-currently-playing user-read-playback-state user-top-read"
 
 
 @dataclass
@@ -62,7 +62,8 @@ def finish(p: Pending, pasted: str):
     if not r.ok:
         raise AuthError(f"Spotify refused the sign-in ({r.status_code}). Start again from Connect.")
     TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
-    TOKEN_FILE.write_text(json.dumps({"refresh_token": r.json()["refresh_token"]}))
+    tok = r.json()
+    TOKEN_FILE.write_text(json.dumps({"refresh_token": tok["refresh_token"], "scope": tok.get("scope", SCOPE)}))
     TOKEN_FILE.chmod(0o600)
 
 

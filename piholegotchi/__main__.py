@@ -22,7 +22,9 @@ from . import schedule
 from .adguard import AdGuard
 from .calendar_feed import CalendarSource
 from .config import Config
+from .homeassistant import HomeAssistant, Inbox
 from .moods import Moods
+from .flightdeck import FlightDeck
 from .render import Stats, mood, muncher, setup_screen, sleeve
 from .screens import draw
 from .server import Glances
@@ -38,6 +40,8 @@ FULL_EVERY = 30           # force a full refresh after this many partials (clear
 WEATHER_EVERY = 1200      # seconds between forecast updates
 SERVER_EVERY = 60         # seconds between server checks
 CALENDAR_EVERY = 900      # seconds between calendar checks
+TOP_EVERY = 6 * 3600      # seconds between Spotify top-track checks
+HOME_EVERY = 60           # seconds between Home Assistant checks
 NUDGE_SHOW = 60           # while music plays, a nudge cuts in for this long...
 NUDGE_GAP = 600           # ...at most this often
 
@@ -69,6 +73,8 @@ class State:
         self.restart = False              # set after an update is installed
         self.data: dict = {}              # latest weather, server, bins, reminders (for the picker)
         self.moods = Moods()
+        self.flightdeck = FlightDeck()
+        self.inbox = Inbox()               # a message pushed from Home Assistant
 
     def publish(self, img, screen, detail, stats):
         with self.lock:
@@ -112,8 +118,11 @@ class Sources:
             WeatherSource(cfg.weather_lat, cfg.weather_lon, cfg.weather_name or cfg.weather_place)
         self.server = old.server if same("server_url") else Glances(cfg.server_url)
         self.calendar = old.calendar if same("calendar_url") else CalendarSource(cfg.calendar_url)
+        self.home = old.home if same("ha_url", "ha_token") else HomeAssistant(cfg.ha_url, cfg.ha_token)
         self.changed = {
             "calendar": not same("calendar_url"),
+            "home": not same("ha_url", "ha_token", "ha_entities"),
+            "spotify": not same("spotify_client_id"),
             "adguard": not same("adguard_url", "adguard_username", "adguard_password"),
             "weather": not same("weather_lat", "weather_lon", "weather_place"),
             "server": not same("server_url"),
@@ -181,6 +190,8 @@ def main():
     weather, next_weather = None, 0.0
     server, next_server = None, 0.0
     agenda, next_cal = None, 0.0
+    top, next_top = None, 0.0
+    home, next_home = None, 0.0
     track, paused_since = None, None
     last_key, last_bytes, partials = None, None, 0
     night = None                              # ((style, until), image) while night mode is on
@@ -199,11 +210,15 @@ def main():
                 weather, next_weather = None, 0
             if src.changed["server"]:
                 server, next_server = None, 0
+            if src.changed["spotify"]:
+                top, next_top = None, 0
             if src.changed["calendar"]:
                 agenda, next_cal = None, 0
+            if src.changed["home"]:
+                home, next_home = None, 0
 
         if state.stats_stale:
-            state.stats_stale, next_stats, next_weather, next_server, next_cal = False, 0, 0, 0, 0
+            state.stats_stale, next_stats, next_weather, next_server, next_cal, next_home = False, 0, 0, 0, 0, 0
         if now >= next_stats:
             raw = src.adguard.stats() if cfg.adguard_url else Stats(0, 0, 0.0, online=False, note="SET UP ADGUARD")
             next_stats = now + STATS_EVERY
@@ -217,7 +232,12 @@ def main():
             server, next_server = src.server.get(), now + SERVER_EVERY
         if on.get("calendar") and src.calendar.configured and now >= next_cal:
             agenda, next_cal = src.calendar.get(), now + CALENDAR_EVERY
+        if on.get("home") and src.home.configured and now >= next_home:
+            home, next_home = src.home.get(cfg.ha_entities), now + HOME_EVERY
+        msg = state.inbox.now(now) if on.get("message") else None
         events = [e for e in agenda.events if e.end > clock] if agenda else None
+        if on.get("repeat") and src.spotify.configured and now >= next_top:
+            top, next_top = src.spotify.top(), now + TOP_EVERY
 
         t = src.spotify.now_playing()
         if t and t.is_playing:
@@ -230,7 +250,11 @@ def main():
 
         bins = schedule.bin_day(cfg.bins, clock) if on.get("bins") else None
         rems = schedule.reminders(cfg.reminders, clock)
-        data = {"server": server, "weather": weather, "bins": bins, "reminders": rems, "calendar": events}
+        state.flightdeck.tick(now)
+        fd = state.flightdeck.snapshot(now)
+        data = {"deck": fd["deck"], "focus": fd["focus"], "focus_done": fd["focus_done"], "server": server, "weather": weather, "bins": bins, "reminders": rems, "calendar": events,
+                "snack": stats.top if stats else [], "snack_total": stats.blocked if stats else 0, "repeat": top,
+                "home": home, "message": msg}
         heads_up = cfg.calendar_heads_up * 60
         soon = bool(events and heads_up and not events[0].all_day
                     and 0 <= (events[0].start - clock).total_seconds() <= heads_up)
@@ -239,13 +263,17 @@ def main():
             ("muncher", on.get("muncher") and bool(cfg.adguard_url)),
             ("weather", on.get("weather") and src.weather.configured),
             ("server", on.get("server") and src.server.configured),
-            ("calendar", on.get("calendar") and src.calendar.configured)) if ok]
+            ("calendar", on.get("calendar") and src.calendar.configured),
+            ("snack", on.get("snack") and bool(stats and stats.top)),
+            ("repeat", on.get("repeat") and bool(top and top.tracks)),
+            ("deck", on.get("deck") and bool(fd["deck"] and fd["deck"].fresh(clock))),
+            ("home", on.get("home") and bool(home and home.items))) if ok]
         nudges = [n for n, ok in (
             ("bins", bins is not None),
             ("reminders", on.get("reminders") and any(r.due for r in rems)),
             ("calendar", on.get("calendar") and soon)) if ok]
 
-        anything = (cfg.adguard_url or src.spotify.configured or src.weather.configured
+        anything = (msg or fd["deck"] or fd["focus"] or src.home.configured or cfg.adguard_url or src.spotify.configured or src.weather.configured
                     or src.server.configured or src.calendar.configured or cfg.bins or cfg.reminders)
         if not anything:
             ip = local_ip()
@@ -268,6 +296,11 @@ def main():
                 name = "muncher"                  # a record or a hungry Muncher takes over the screen
             if name != "sleeve" and "calendar" in nudges:
                 name = "calendar"                 # something's about to start
+            focusing = on.get("focus") and (fd["focus"] is not None or fd["focus_done"])
+            if focusing and (name != "sleeve" or cfg.focus_over_music):
+                name = "focus"                    # a Focus session on the phone or the settings page
+            if msg and (name != "sleeve" or cfg.message_over_music):
+                name = "message"                  # pushed from Home Assistant
             style = cfg.styles.get(name, "A")
             if name == "sleeve" and track:
                 img, key = sleeve(track), ("sleeve", track.id)
@@ -277,6 +310,8 @@ def main():
                 detail = f"Mood: {mood(stats)}"
             else:
                 img, key = draw(name, style, data, clock), (name, style)
+                if name == "message":
+                    key += (msg.until,)           # a new message gets a full refresh
                 detail = DETAILS[name](data)
         state.data = data
 
@@ -319,6 +354,12 @@ DETAILS = {
     "weather": lambda d: (f"{d['weather'].desc}, {round(d['weather'].temp)}°" if d.get("weather") else "No weather yet"),
     "server": lambda d: (f"Disk {d['server'].disk:.0f}% full" if d.get("server") and d["server"].online
                          else "Can't reach the server"),
+    "deck": lambda d: (f"Next step: {d['deck'].next_title}" if d.get("deck") else "Waiting for Flight Deck"),
+    "focus": lambda d: (f"Focus: {d['focus'].task}" if d.get("focus") else "Focus done"),
+    "home": lambda d: (", ".join(f"{i.label} {i.value}" for i in d["home"].items[:2]) if d.get("home") else "Home"),
+    "message": lambda d: (f"Message: {d['message'].text}" if d.get("message") else "No message"),
+    "snack": lambda d: (f"Biggest snack: {d['snack'][0][0]}" if d.get("snack") else "Nothing eaten yet"),
+    "repeat": lambda d: (f"On repeat: {d['repeat'].tracks[0][0]}" if d.get("repeat") and d["repeat"].tracks else "No plays yet"),
     "calendar": lambda d: (f"Next: {d['calendar'][0].title}" if d.get("calendar") else "Nothing on the calendar"),
     "bins": lambda d: "Bin day: " + ", ".join(b.name for b in d["bins"].bins if b.on),
     "reminders": lambda d: next((r.title for r in d["reminders"] if r.due), "Nothing due"),

@@ -11,7 +11,7 @@ from datetime import datetime
 
 from PIL import Image, ImageDraw
 
-from .render import INK, PAPER, W, H, Canvas, fit, fit_size, grot, pix, vt
+from .render import INK, PAPER, W, H, Canvas, fit, fit_size, grot, pix, text_w, vt
 
 STYLES = ("A", "B", "C")
 
@@ -51,6 +51,15 @@ class Weather:
     sun_label: str              # "SUNSET 16:14" or "SUNRISE 07:12"
     slots: list                 # four Slots: now, then every 3 hours
     outlook: str = ""           # "Rain from 18:00"
+
+
+@dataclass
+class Top:
+    tracks: list                # [(title, artist)], most played first
+    artists: list               # [name]
+    track_art: Image.Image | None = None    # dithered, 106x106
+    artist_art: Image.Image | None = None
+    note: str = ""              # why it's empty
 
 
 @dataclass
@@ -866,6 +875,606 @@ def render_calendar(style: str, events: list, now: datetime) -> Image.Image:
     return {"B": calendar_b, "C": calendar_c}.get(style, calendar_a)(events, now)
 
 
+# ================================================================ biggest snack (top blocked domain)
+
+def _host(d: str) -> str:
+    return d[4:] if d.startswith("www.") else d
+
+
+def fit_left(s: str, width: int, font) -> str:
+    """Trim from the left, so the end of a domain (the bit that names it) stays."""
+    if font.getlength(s) <= width:
+        return s
+    while s and font.getlength("…" + s) > width:
+        s = s[1:]
+    return "…" + s
+
+
+def _domain(s: str, width: int, sizes=(19, 17, 15, 13)):
+    for z in sizes:
+        if grot(z).getlength(s) <= width:
+            return s, grot(z)
+    return fit_left(s, width, grot(sizes[-1])), grot(sizes[-1])
+
+
+def _plate(c: Canvas, cx, cy):
+    """A plate with an AD on it, knife and fork either side."""
+    d = c.d
+    d.ellipse([cx - 30, cy - 30, cx + 30, cy + 30], outline=INK, width=2)
+    d.ellipse([cx - 21, cy - 21, cx + 21, cy + 21], outline=INK, width=1)
+    c.box(cx - 13, cy - 9, 27, 19)
+    c.box(cx - 12, cy - 8, 25, 17)
+    c.text((cx + 1, cy + 4), "AD", pix(), anchor="ms")
+    fx, kx = cx - 42, cx + 42
+    c.rect(fx - 1, cy - 4, 3, 34)
+    for i in (-4, 0, 4):
+        c.rect(fx + i - 0, cy - 22, 1, 14)
+    c.rect(fx - 4, cy - 9, 9, 3)
+    d.polygon([(kx - 2, cy - 24), (kx + 3, cy - 20), (kx + 3, cy - 2), (kx - 2, cy - 2)], fill=INK)
+    c.rect(kx - 1, cy - 2, 3, 32)
+
+
+def _no_snack(why: str) -> Image.Image:
+    c = Canvas()
+    _plate(c, 56, 62)
+    x = 130
+    c.text((x, 24), "BIGGEST SNACK", pix())
+    c.text((x - 1, 52), "Empty plate", grot(19))
+    c.text((x, 70), "Nothing yet.", vt(20))
+    c.rect(x, 82, 112, 1)
+    c.text((x, 96), fit(why, 112, pix()), pix())
+    return c.finish()
+
+
+def snack_a(top: list) -> Image.Image:
+    """Plate: today's most-blocked domain, served up."""
+    if not top:
+        return _no_snack("CHECK ADGUARD")
+    c = Canvas()
+    _plate(c, 56, 62)
+    x = 120
+    name, n = top[0]
+    c.text((x, 22), "TODAY'S BIGGEST SNACK", pix())
+    txt, f = _domain(_host(name), 122)
+    c.text((x - 1, 48), txt, f)
+    c.text((x, 66), f"{n:,} bites.", vt(20))
+    c.rect(x, 80, 122, 1)
+    if len(top) > 1:
+        c.text((x, 94), "RUNNER-UP", pix())
+        c.text((x, 108), fit_left(_host(top[1][0]), 122, vt(16)), vt(16))
+    return c.finish()
+
+
+def snack_b(top: list) -> Image.Image:
+    """Menu: the top five, with dotted leaders like a café board."""
+    c = Canvas()
+    c.text((125, 18), "TODAY'S MENU", pix(), anchor="ms")
+    c.rect(60, 22, 130, 1)
+    if not top:
+        c.text((125, 70), "Nothing eaten yet.", vt(20), anchor="ms")
+        return c.finish()
+    for i, (name, n) in enumerate(top[:5]):
+        y = 40 + i * 18
+        num = f"{n:,}"
+        f = grot(13, "Bold" if i == 0 else "Medium")
+        nw = pix().getlength(num)
+        host = fit_left(_host(name), 234 - nw - 22, f)
+        c.text((8, y), host, f)
+        hx = 8 + f.getlength(host) + 4
+        for xx in range(int(hx), int(242 - nw - 4), 3):
+            c.d.point((xx, y - 1), fill=INK)
+        c.text((242, y), num, pix(), anchor="rs")
+    return c.finish()
+
+
+def snack_c(top: list, blocked: int) -> Image.Image:
+    """Receipt: inverted header, big count, the domain underneath."""
+    if not top:
+        return _no_snack("CHECK ADGUARD")
+    name, n = top[0]
+    c = Canvas()
+    c.rect(0, 0, W, 26)
+    c.text((125, 17), "BIGGEST SNACK TODAY", pix(), anchor="ms", fill=PAPER)
+    num, f = fit_size(f"{n:,}", 234, (48, 42, 36), grot)
+    c.text((125, 72), num, f, anchor="ms")
+    txt, df = _domain(_host(name), 234, (17, 15, 13))
+    c.text((125, 94), txt, df, anchor="ms")
+    share = f"{n / blocked * 100:.0f}% OF EVERYTHING EATEN" if blocked else ""
+    for xx in range(8, 242, 4):
+        c.rect(xx, 101, 2, 1)
+    c.text((125, 115), share, pix(), anchor="ms")
+    return c.finish()
+
+
+def render_snack(style: str, top: list, blocked: int) -> Image.Image:
+    if style == "B":
+        return snack_b(top)
+    return snack_c(top, blocked) if style == "C" else snack_a(top)
+
+
+# ================================================================ on repeat (Spotify top items)
+
+def _hatch_art(size=106) -> Image.Image:
+    im = Image.new("1", (size, size), 255)
+    d = ImageDraw.Draw(im)
+    for i in range(-size, size, 6):
+        d.line([(i, size), (i + size, 0)], fill=0)
+    d.rectangle([0, 0, size - 1, size - 1], outline=0)
+    return im
+
+
+def _no_top(why: str) -> Image.Image:
+    c = Canvas()
+    c.paste_bits(_hatch_art(), (8, 8))
+    x = 124
+    c.text((x, 15), "ON REPEAT", pix())
+    c.text((x - 1, 44), "No plays yet", grot(17))
+    c.text((x, 62), "Play some music.", vt(18))
+    c.rect(x, 84, 118, 1)
+    c.text((x, 100), fit(why, 118, pix()), pix())
+    return c.finish()
+
+
+def repeat_a(t: Top) -> Image.Image:
+    """Cover: the most played track, like Sleeve, with the top artist underneath."""
+    if not t.tracks:
+        return _no_top(t.note or "NOTHING IN 4 WEEKS")
+    c = Canvas()
+    c.paste_bits(t.track_art or _hatch_art(), (8, 8))
+    x, w = 124, 118
+    c.text((x, 15), "ON REPEAT · 4 WEEKS", pix())
+    title, tf = fit_size(t.tracks[0][0], w, (19, 17, 15), grot)
+    c.text((x - 1, 42), title, tf)
+    c.text((x, 59), fit(t.tracks[0][1], w, vt(19)), vt(19))
+    c.rect(x, 74, w, 1)
+    if t.artists:
+        c.text((x, 90), "TOP ARTIST", pix())
+        c.text((x - 1, 108), fit(t.artists[0], w, grot(15)), grot(15))
+    return c.finish()
+
+
+def repeat_b(t: Top) -> Image.Image:
+    """Chart: the top five tracks, numbered."""
+    c = Canvas()
+    c.text((8, 18), "YOUR TOP 5", pix())
+    c.text((242, 18), "LAST 4 WEEKS", pix(), anchor="rs")
+    c.rect(8, 23, 234, 2)
+    if not t.tracks:
+        c.text((125, 70), "Nothing yet.", grot(20), anchor="ms")
+        c.text((125, 92), fit(t.note or "PLAY SOME MUSIC", 220, pix()), pix(), anchor="ms")
+        return c.finish()
+    for i, (title, artist) in enumerate(t.tracks[:5]):
+        y = 41 + i * 18
+        first = i == 0
+        c.text((20, y), str(i + 1), grot(15 if first else 13), anchor="rs")
+        f = grot(14 if first else 13, "Bold" if first else "Medium")
+        tt = fit(title, 130, f)
+        c.text((28, y), tt, f)
+        c.text((242, y), fit(artist.upper(), 234 - 28 - f.getlength(tt) - 10, pix()), pix(), anchor="rs")
+    return c.finish()
+
+
+def repeat_c(t: Top) -> Image.Image:
+    """Artist: the top artist's photo, dithered, with the next two."""
+    if not t.artists:
+        return _no_top(t.note or "NOTHING IN 4 WEEKS")
+    c = Canvas()
+    c.paste_bits(t.artist_art or _hatch_art(), (136, 8))
+    c.text((8, 18), "MOST PLAYED ARTIST", pix())
+    lines = _wrap2(t.artists[0], 122, grot(22))
+    for i, ln in enumerate(lines):
+        c.text((7, 46 + i * 22), ln, grot(22))
+    c.rect(8, 82, 120, 1)
+    rest = t.artists[1:3]
+    for i, a in enumerate(rest):
+        c.text((8, 97 + i * 13), fit(f"{i + 2}. {a}".upper(), 120, pix()), pix())
+    return c.finish()
+
+
+def render_repeat(style: str, t: Top | None) -> Image.Image:
+    t = t or Top([], [], note="CONNECT SPOTIFY")
+    return {"B": repeat_b, "C": repeat_c}.get(style, repeat_a)(t)
+
+
+# ================================================================ flight deck (from the phone app)
+
+def _days_word(d, now: datetime) -> str:
+    if d is None:
+        return ""
+    n = (d - now.date()).days
+    if n < 0:
+        return "OVERDUE"
+    return {0: "TODAY", 1: "TOMORROW"}.get(n, d.strftime("%a %-d %b").upper())
+
+
+def _stat(c: Canvas, x, y, w, label, value):
+    c.text((x + w / 2, y), value, grot(18), anchor="ms")
+    c.text((x + w / 2, y + 12), label, pix(), anchor="ms")
+
+
+def _no_deck(why: str) -> Image.Image:
+    c = Canvas()
+    c.d.rounded_rectangle([18, 22, 92, 100], 8, outline=INK, width=2)
+    c.rect(30, 34, 50, 6)
+    for i in range(3):
+        c.box(30, 50 + i * 15, 8, 8)
+        c.rect(44, 53 + i * 15, 34 - i * 8, 2)
+    x = 112
+    c.text((x, 24), "FLIGHT DECK", pix())
+    c.text((x - 1, 52), "No word yet", grot(19))
+    c.text((x, 70), "Open the app.", vt(20))
+    c.rect(x, 82, 130, 1)
+    c.text((x, 96), fit(why, 130, pix()), pix())
+    return c.finish()
+
+
+def deck_a(d, now: datetime) -> Image.Image:
+    """Next step: the one thing to do now, with the day's numbers underneath."""
+    if d is None:
+        return _no_deck("SET IT UP IN SETTINGS")
+    c = Canvas()
+    head = "NEXT STEP"
+    if d.next_mins:
+        head += f" · {d.next_mins} MIN"
+    when = _days_word(d.next_due, now)
+    c.text((8, 18), head, pix())
+    if when:
+        c.text((242, 18), when, pix(), anchor="rs")
+    title = d.next_title or "Nothing due. Nice."
+    lines = _wrap2(title, 234, grot(19))
+    for i, ln in enumerate(lines):
+        c.text((7, 42 + i * 20), ln, grot(19))
+    c.rect(8, 84, 234, 1)
+    stats = [("DUE", str(d.due)), ("FOCUS", f"{d.focus_min}m"),
+             ("HABITS", f"{d.habits_done}/{d.habits_total}" if d.habits_total else "-")]
+    for i, (lab, val) in enumerate(stats):
+        x = 8 + i * 78
+        if i:
+            c.rect(x - 1, 90, 1, 28)
+        _stat(c, x, 106, 78, lab, val)
+    if not d.fresh(now):
+        c.text((242, 30), "OLD", pix(), anchor="rs")
+    return c.finish()
+
+
+def deck_b(d, now: datetime) -> Image.Image:
+    """Tiles: four numbers for the day, water as a bar."""
+    if d is None:
+        return _no_deck("SET IT UP IN SETTINGS")
+    c = Canvas()
+    tiles = [("TASKS DUE", str(d.due)), ("FOCUS", f"{d.focus_min} min"),
+             ("HABITS", f"{d.habits_done} of {d.habits_total}" if d.habits_total else "None"),
+             ("JOBS OPEN", str(d.jobs_open))]
+    for i, (lab, val) in enumerate(tiles):
+        x, y = 4 + (i % 2) * 122, 4 + (i // 2) * 52
+        c.d.rounded_rectangle([x, y, x + 118, y + 47], 5, outline=INK, width=1 if i else 2)
+        c.text((x + 8, y + 14), lab, pix())
+        c.text((x + 7, y + 38), fit(val, 104, grot(20)), grot(20))
+    if d.water_goal:
+        frac = min(1.0, (d.water_ml or 0) / d.water_goal)
+        c.text((8, 118), "WATER", pix())
+        bar(c, 50, 111, 150, 8, frac)
+        c.text((242, 118), f"{(d.water_ml or 0) / 1000:.1f}L", pix(), anchor="rs")
+    else:
+        c.text((125, 118), (d.energy + " ENERGY DAY").strip().upper(), pix(), anchor="ms")
+    return c.finish()
+
+
+def deck_c(d, now: datetime) -> Image.Image:
+    """Job hunt: open applications and the next follow-up."""
+    if d is None:
+        return _no_deck("SET IT UP IN SETTINGS")
+    c = Canvas()
+    c.rect(0, 0, W, 26)
+    c.text((8, 17), "JOB HUNT", pix(), fill=PAPER)
+    c.text((242, 17), f"{d.jobs_open} OPEN", pix(), anchor="rs", fill=PAPER)
+    if d.follow_company:
+        c.text((8, 44), "FOLLOW UP " + _days_word(d.follow_date, now), pix())
+        txt, f = fit_size(d.follow_company, 234, (30, 26, 22, 18), grot)
+        c.text((6, 76), txt, f)
+        c.text((8, 96), fit(d.follow_role, 234, vt(20)), vt(20))
+        c.rect(8, 104, 234, 1)
+        c.text((8, 117), fit("NEXT STEP: " + (d.next_title or "NONE").upper(), 234, pix()), pix())
+    else:
+        c.text((8, 70), "No follow-ups due.", grot(19))
+        c.text((8, 92), f"{d.jobs_open} applications still open." if d.jobs_open else "Time to send one?", vt(20))
+    return c.finish()
+
+
+def render_deck(style: str, d, now: datetime) -> Image.Image:
+    return {"B": deck_b, "C": deck_c}.get(style, deck_a)(d, now)
+
+
+# ---------------------------------------------------------------- focus timer
+
+def _mins_left(s: int) -> str:
+    m = math.ceil(s / 60)
+    return f"{m} min" if m < 60 else f"{m // 60}h {m % 60:02d}m"
+
+
+def _focus_done(task: str) -> Image.Image:
+    from .render import _creature
+    c = Canvas()
+    _creature(c, "stuffed")
+    x = 130
+    c.text((x, 24), "FOCUS DONE", pix())
+    c.text((x - 1, 52), "Nice one.", grot(22))
+    c.text((x, 70), "Take a break.", vt(20))
+    c.rect(x, 82, 112, 1)
+    c.text((x, 96), fit(task.upper(), 112, pix()), pix())
+    return c.finish()
+
+
+def focus_a(f, now: float) -> Image.Image:
+    """Ring: time left in a ring that empties."""
+    c = Canvas()
+    left = f.left(now)
+    frac = left / f.total_s if f.total_s else 0
+    cx, cy, r = 58, 61, 50
+    c.d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=INK, width=2)
+    if frac > 0:
+        c.d.pieslice([cx - r + 6, cy - r + 6, cx + r - 6, cy + r - 6], -90, -90 + 360 * frac, fill=INK)
+    c.d.ellipse([cx - r + 16, cy - r + 16, cx + r - 16, cy + r - 16], fill=PAPER, outline=INK)
+    m = math.ceil(left / 60)
+    c.text((cx, cy + 8), str(m), grot(26 if m < 100 else 20), anchor="ms")
+    c.text((cx, cy + 20), "MIN", pix(), anchor="ms")
+    x = 124
+    c.text((x, 24), "FOCUSING" if f.running else "PAUSED", pix())
+    lines = _wrap2(f.task, 118, grot(17))
+    for i, ln in enumerate(lines):
+        c.text((x - 1, 48 + i * 18), ln, grot(17))
+    c.rect(x, 88, 118, 1)
+    c.text((x, 102), f"{f.total_s // 60} MIN SESSION", pix())
+    return c.finish()
+
+
+def focus_b(f, now: float) -> Image.Image:
+    """Bar: big time left, the task, a bar along the bottom."""
+    c = Canvas()
+    left = f.left(now)
+    c.text((8, 18), "FOCUS" if f.running else "FOCUS · PAUSED", pix())
+    c.text((242, 18), f"OF {f.total_s // 60} MIN", pix(), anchor="rs")
+    txt, ft = fit_size(_mins_left(left) + (" left" if f.running else ""), 234, (46, 40, 34), grot)
+    c.text((5, 62), txt, ft)
+    c.text((8, 86), fit(f.task, 234, grot(17)), grot(17))
+    bar(c, 8, 100, 234, 14, 1 - (left / f.total_s if f.total_s else 0))
+    return c.finish()
+
+
+def focus_c(f, now: float) -> Image.Image:
+    """Muncher: it keeps you company, eyes shut, headphones on."""
+    from .render import _creature
+    c = Canvas()
+    _creature(c, "content")
+    d = c.d
+    d.arc([10, 22, 86, 98], 180, 360, fill=INK, width=4)     # headphones
+    d.rounded_rectangle([8, 54, 20, 74], 3, fill=INK)
+    d.rounded_rectangle([76, 54, 88, 74], 3, fill=INK)
+    x = 130
+    c.text((x, 24), "SHH, FOCUSING" if f.running else "ON PAUSE", pix())
+    c.text((x - 1, 53), _mins_left(f.left(now)), grot(26))
+    c.text((x, 70), "to go.", vt(20))
+    c.rect(x, 82, 112, 1)
+    c.text((x, 96), fit(f.task.upper(), 112, pix()), pix())
+    return c.finish()
+
+
+def render_focus(style: str, f, now: float, done_task: str = "") -> Image.Image:
+    if f is None:
+        return _focus_done(done_task or "SESSION")
+    return {"B": focus_b, "C": focus_c}.get(style, focus_a)(f, now)
+
+
+# ---------------------------------------------------------------- home assistant
+
+def _hicon(c: Canvas, kind: str, x, y, s=14, on=None):
+    """A small icon in an s x s box at (x, y)."""
+    d = c.d
+    m = s / 14
+    def P(px, py):
+        return (x + px * m, y + py * m)
+    if kind == "light":
+        d.ellipse([*P(2, 0), *P(12, 10)], fill=INK if on else PAPER, outline=INK, width=2)
+        d.rectangle([*P(4.5, 10), *P(9.5, 13)], fill=INK)
+    elif kind == "lock":
+        d.arc([*P(3, 0), *P(11, 10)], 180, 360, fill=INK, width=2)
+        if on is False:
+            d.rectangle([*P(9, 3), *P(12, 6)], fill=PAPER)
+        d.rectangle([*P(1, 6), *P(13, 14)], fill=INK)
+        d.rectangle([*P(6, 8), *P(8, 11)], fill=PAPER)
+    elif kind == "door":
+        d.rectangle([*P(2, 0), *P(12, 14)], outline=INK, width=2)
+        if on:
+            d.polygon([P(2, 0), P(9, 2), P(9, 14), P(2, 14)], fill=INK)
+        d.rectangle([*P(8, 7), *P(9.5, 8.5)], fill=PAPER if on else INK)
+    elif kind == "motion":
+        d.ellipse([*P(5, 0), *P(9, 4)], fill=INK)
+        d.line([P(7, 4), P(6, 9), P(3, 14)], fill=INK, width=2)
+        d.line([P(6, 9), P(10, 14)], fill=INK, width=2)
+        d.line([P(3, 6), P(11, 6)], fill=INK, width=2)
+    elif kind in ("temp", "climate"):
+        d.rounded_rectangle([*P(5, 0), *P(9, 10)], 2 * m, outline=INK, width=2)
+        d.ellipse([*P(3, 8), *P(11, 14)], fill=INK)
+        d.rectangle([*P(6.5, 4), *P(7.5, 10)], fill=INK)
+    elif kind == "humidity":
+        d.polygon([P(7, 0), P(12, 8), P(2, 8)], fill=INK)
+        d.ellipse([*P(2, 4), *P(12, 14)], fill=INK)
+    elif kind == "power":
+        d.polygon([P(8, 0), P(2, 8), P(7, 8), P(5, 14), P(12, 5), P(7, 5)], fill=INK)
+    elif kind == "battery":
+        d.rectangle([*P(0, 3), *P(12, 11)], outline=INK, width=2)
+        d.rectangle([*P(12, 5), *P(14, 9)], fill=INK)
+        d.rectangle([*P(2, 5), *P(7, 9)], fill=INK)
+    elif kind == "person":
+        d.ellipse([*P(4, 0), *P(10, 6)], fill=INK if on is not False else PAPER, outline=INK, width=2)
+        d.chord([*P(1, 7), *P(13, 21)], 180, 360, fill=INK if on is not False else PAPER, outline=INK, width=2)
+    elif kind == "media":
+        d.polygon([P(3, 1), P(13, 7), P(3, 13)], fill=INK)
+    elif kind == "plug":
+        d.ellipse([*P(0, 0), *P(14, 14)], fill=INK if on else PAPER, outline=INK, width=2)
+        d.line([P(7, 2.5), P(7, 7)], fill=PAPER if on else INK, width=2)
+    else:
+        d.ellipse([*P(4, 4), *P(10, 10)], fill=INK)
+
+
+def _no_home(why: str) -> Image.Image:
+    c = Canvas()
+    d = c.d
+    d.polygon([(20, 56), (55, 24), (90, 56)], fill=INK)            # a little house
+    c.rect(28, 56, 54, 42)
+    c.rect(47, 72, 16, 26, fill=PAPER)
+    d.rectangle([33, 62, 42, 70], fill=PAPER)
+    d.rectangle([68, 62, 77, 70], fill=PAPER)
+    x = 112
+    c.text((x, 24), "HOME", pix())
+    c.text((x - 1, 52), "No home yet", grot(19))
+    c.text((x, 70), "Connect it.", vt(20))
+    c.rect(x, 82, 130, 1)
+    c.text((x, 96), fit(why, 130, pix()), pix())
+    return c.finish()
+
+
+def home_a(h) -> Image.Image:
+    """Tiles: up to four things, a lit tile when it's on."""
+    if h is None or not h.items:
+        return _no_home(h.note if h else "SET IT UP IN SETTINGS")
+    c = Canvas()
+    items = h.items[:4]
+    n = len(items)
+    cols = 1 if n == 1 else 2
+    rows = 1 if n <= 2 else 2
+    tw, th = (242 if cols == 1 else 119), (114 if rows == 1 else 55)
+    for i, it in enumerate(items):
+        x, y = 4 + (i % cols) * (tw + 4), 4 + (i // cols) * (th + 4)
+        lit = bool(it.on)
+        ink = PAPER if lit else INK
+        c.d.rounded_rectangle([x, y, x + tw - 1, y + th - 1], 5, fill=INK if lit else PAPER, outline=INK, width=2)
+        if lit:   # icons draw in ink, so give them a paper chip on a lit tile
+            c.d.rounded_rectangle([x + tw - 25, y + 5, x + tw - 6, y + 24], 4, fill=PAPER)
+        _hicon(c, it.kind, x + tw - 22, y + 8, 13, it.on)
+        c.text((x + 8, y + 14), fit(it.label.upper(), tw - 36, pix()), pix(), fill=ink)
+        big = (30, 26, 22, 18) if rows == 1 else (22, 19, 17, 15)
+        txt, f = fit_size(it.value, tw - 14, big, grot)
+        c.text((x + 7, y + th - 9), txt, f, fill=ink)
+    return c.finish()
+
+
+def home_b(h) -> Image.Image:
+    """List: a row each, icon, name and state."""
+    if h is None or not h.items:
+        return _no_home(h.note if h else "SET IT UP IN SETTINGS")
+    c = Canvas()
+    c.rect(0, 0, W, 20)
+    c.text((8, 14), "HOME", pix(), fill=PAPER)
+    on = sum(1 for it in h.items if it.on)
+    c.text((242, 14), f"{on} ON" if on else "ALL QUIET", pix(), anchor="rs", fill=PAPER)
+    items = h.items[:5]
+    rh = min(24, 100 // len(items))
+    for i, it in enumerate(items):
+        y = 22 + i * rh
+        _hicon(c, it.kind, 8, y + (rh - 13) // 2, 13, it.on)
+        f = grot(17 if rh >= 22 else 15)
+        val_w = text_w(f, it.value)
+        c.text((242, y + rh - 6), fit(it.value, 120, f), f, anchor="rs")
+        c.text((28, y + rh - 7), fit(it.label, 210 - min(120, val_w), vt(20)), vt(20))
+        if i < len(items) - 1:
+            c.rect(28, y + rh, 214, 1)
+    return c.finish()
+
+
+def home_c(h) -> Image.Image:
+    """Big one: the first thing large, the rest along the bottom."""
+    if h is None or not h.items:
+        return _no_home(h.note if h else "SET IT UP IN SETTINGS")
+    c = Canvas()
+    first, rest = h.items[0], h.items[1:4]
+    _hicon(c, first.kind, 8, 8, 18, first.on)
+    c.text((34, 22), fit(first.label.upper(), 208, pix()), pix())
+    txt, f = fit_size(first.value, 234, (46, 40, 34, 28, 22), grot)
+    c.text((5, 70 if rest else 90), txt, f)
+    if rest:
+        c.rect(8, 82, 234, 1)
+        w = 234 // len(rest)
+        for i, it in enumerate(rest):
+            x = 8 + i * w
+            if i:
+                c.rect(x - 4, 88, 1, 30)
+            _hicon(c, it.kind, x, 90, 11, it.on)
+            c.text((x + 15, 100), fit(it.label.upper(), w - 20, pix()), pix())
+            c.text((x, 117), fit(it.value, w - 8, grot(15)), grot(15))
+    return c.finish()
+
+
+def render_home(style: str, h) -> Image.Image:
+    return {"B": home_b, "C": home_c}.get(style, home_a)(h)
+
+
+def _lines(text: str, width: int, font, most: int) -> list[str]:
+    words, out = text.split(), []
+    while words and len(out) < most:
+        ln = ""
+        while words and font.getlength((ln + " " + words[0]).strip()) <= width:
+            ln = (ln + " " + words.pop(0)).strip()
+        if not ln:
+            ln = words.pop(0)
+        out.append(ln)
+    if words:
+        out[-1] = fit(out[-1] + " " + " ".join(words), width, font)
+    return [fit(ln, width, font) for ln in out]
+
+
+def _msg_text(c: Canvas, text: str, x, top, width, bottom):
+    """The biggest size that fits the message in the space."""
+    for size in (26, 22, 19, 17, 15):
+        f = grot(size)
+        gap = size + 3
+        most = max(1, int((bottom - top) // gap))
+        ls = _lines(text, width, f, most)
+        if len(ls) < most or " ".join(ls) == " ".join(text.split()) or size == 15:
+            for i, ln in enumerate(ls):
+                c.text((x, top + size + i * gap), ln, f)
+            return
+
+
+def message_a(m) -> Image.Image:
+    """Bell: a bell on the left, the message beside it."""
+    c = Canvas()
+    bell(c, 14, 10)
+    x = 86
+    c.text((x, 20), (m.title or "HOME ASSISTANT").upper()[:24], pix())
+    c.rect(x, 26, 156, 1)
+    _msg_text(c, m.text, x - 1, 30, 156, 118)
+    return c.finish()
+
+
+def message_b(m) -> Image.Image:
+    """Banner: a bar across the top, the message large."""
+    c = Canvas()
+    c.rect(0, 0, W, 24)
+    c.text((8, 16), (m.title or "MESSAGE").upper()[:30], pix(), fill=PAPER)
+    c.text((242, 16), datetime.now().strftime("%H:%M"), pix(), anchor="rs", fill=PAPER)
+    _msg_text(c, m.text, 6, 28, 238, 120)
+    return c.finish()
+
+
+def message_c(m) -> Image.Image:
+    """Muncher: it holds up a sign with your message."""
+    from .render import _creature
+    c = Canvas()
+    _creature(c, "content")
+    d = c.d
+    d.rounded_rectangle([104, 6, 244, 116], 8, fill=PAPER, outline=INK, width=2)
+    d.polygon([(104, 62), (86, 70), (104, 76)], fill=INK)       # speech-bubble tail
+    d.line([(104, 64), (104, 74)], fill=PAPER, width=1)
+    c.text((114, 22), (m.title or "PSST").upper()[:18], pix())
+    _msg_text(c, m.text, 113, 26, 122, 112)
+    return c.finish()
+
+
+def render_message(style: str, m) -> Image.Image:
+    return {"B": message_b, "C": message_c}.get(style, message_a)(m)
+
+
 # ================================================================ samples (for the picker before things are set up)
 
 def _sample_events(now: datetime) -> list:
@@ -877,6 +1486,32 @@ def _sample_events(now: datetime) -> list:
     return [Event("Portfolio review with Sam", t, t + timedelta(hours=1), False, "Zoom"),
             Event("Climbing", base.replace(hour=19, minute=30), base.replace(hour=21, minute=0), False, ""),
             Event("Mum's birthday", tom, tom + timedelta(days=1), True, "")]
+
+
+def _sample_deck(now: datetime):
+    from datetime import timedelta
+    from .flightdeck import DeckDay
+    return DeckDay(sent=now, energy="Med", next_title="Tailor CV for the Monzo role", next_due=now.date(), next_mins=25,
+                   due=4, focus_min=50, habits_done=3, habits_total=5, water_ml=1250, water_goal=2000, jobs_open=6,
+                   follow_company="Monzo", follow_role="Product designer", follow_date=now.date() + timedelta(days=2))
+
+
+def _sample_focus(now: datetime):
+    from .flightdeck import FocusRun
+    t = now.timestamp()
+    return FocusRun("Write the Piholegotchi case study", True, t + 18 * 60, 18 * 60, 25 * 60)
+
+
+def _sample_home():
+    from .homeassistant import Home, Item
+    return Home([Item("Living room", "21.5°", "temp"), Item("Front door", "LOCKED", "lock", True),
+                 Item("Desk lamp", "ON", "light", True), Item("Washing", "412 W", "power"),
+                 Item("Sam", "AWAY", "person", False)])
+
+
+def _sample_message(now: datetime):
+    from .homeassistant import Message
+    return Message("The washing's done. Hang it out before it gets crumpled.", "Utility room", now.timestamp() + 300)
 
 
 def samples(now: datetime) -> dict:
@@ -892,6 +1527,16 @@ def samples(now: datetime) -> dict:
                        "NEXT: GREEN, " + (now.date() + timedelta(days=8)).strftime("%a %-d").upper()),
         "night": {"blocked": 4812, "until": "07:00"},
         "calendar": _sample_events(now),
+        "snack": [("doubleclick.net", 1204), ("www.googletagmanager.com", 866), ("graph.facebook.com", 512),
+                  ("app-measurement.com", 341), ("ads.tiktok.com", 198)],
+        "snack_total": 4812,
+        "deck": _sample_deck(now),
+        "focus": _sample_focus(now),
+        "home": _sample_home(),
+        "message": _sample_message(now),
+        "repeat": Top([("Avril 14th", "Aphex Twin"), ("Teardrop", "Massive Attack"), ("Windowlicker", "Aphex Twin"),
+                       ("Roygbiv", "Boards of Canada"), ("Kid A", "Radiohead")],
+                      ["Aphex Twin", "Boards of Canada", "Radiohead"]),
         "reminders": [Reminder("Water the monstera", "plant", True, "NOW", 1, 8, 7),
                       Reminder("Feed Biscuit", "pet", False, "18:00", every=1, at="18:00", since_days=0),
                       Reminder("Mist the ferns", "plant", False, "FRI", every=3, since_days=1),
@@ -910,9 +1555,22 @@ def draw(name: str, style: str, data: dict, now: datetime) -> Image.Image:
         return render_bins(style, b) if b else render_bins(style, samples(now)["bins"])
     if name == "reminders":
         return render_reminders(style, data.get("reminders") or [], now)
+    if name == "deck":
+        return render_deck(style, data.get("deck"), now)
+    if name == "focus":
+        return render_focus(style, data.get("focus"), now.timestamp(), data.get("focus_done", ""))
+    if name == "snack":
+        return render_snack(style, data.get("snack") or [], data.get("snack_total") or 0)
+    if name == "repeat":
+        return render_repeat(style, data.get("repeat"))
     if name == "calendar":
         cal = data.get("calendar")
         return render_calendar(style, cal if cal is not None else [], now)
+    if name == "home":
+        return render_home(style, data.get("home"))
+    if name == "message":
+        m = data.get("message")
+        return render_message(style, m if m else samples(now)["message"])
     if name == "night":
         n = data.get("night") or {}
         return render_night(style, n.get("blocked"), n.get("until", "07:00"))
