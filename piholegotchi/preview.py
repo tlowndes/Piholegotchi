@@ -10,7 +10,10 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+from datetime import datetime
+
 from .render import Stats, Track, atkinson, muncher, setup_screen, sleeve, H, W
+from .screens import STYLES, draw, samples
 
 PAPER_RGB, INK_RGB = (220, 220, 210), (37, 39, 42)
 
@@ -55,6 +58,11 @@ def main():
         "muncher-asleep": muncher(Stats(0, 0, 0, online=False)),
         "setup": setup_screen("piholegotchi", "192.168.1.42"),
     }
+    now = datetime(2026, 11, 11, 17, 5)
+    data = samples(now)
+    for screen in ("server", "weather", "bins", "reminders"):
+        for st in STYLES:
+            shots[f"{screen}-{st.lower()}"] = draw(screen, st, data, now)
     for name, img in shots.items():
         img.save(out / f"{name}-1bit.png")
         to_eink(img).save(out / f"{name}.png")
