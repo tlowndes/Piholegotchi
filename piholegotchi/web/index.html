@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Piholegotchi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='4' width='14' height='9' rx='1.5' fill='%231b1e1f'/%3E%3Crect x='2.5' y='5.5' width='11' height='6' fill='%23dcdcd2'/%3E%3C/svg%3E">
+<style>
+/* Layout: the device sits at the top like it does on the shelf; settings stack below it. */
+:root{
+  --bg:#e3e6e5; --surface:#f1f3f2; --fg:#131617; --muted:#566062; --line:#c6cdcc;
+  --accent:#2a6b55; --accent-fg:#ffffff; --good:#2a6b55; --bad:#a43a2c;
+  --frame:#1b1e1f; --frame-hi:#2c3132; --glass:#d6d6cc;
+  --sans:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1112; --surface:#171a1b; --fg:#e5e9e8; --muted:#94a0a0; --line:#2a3031;
+  --accent:#71c4a2; --accent-fg:#0b1512; --good:#71c4a2; --bad:#e58a7c;
+  --frame:#08090a; --frame-hi:#24292a; color-scheme:dark }}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.55 var(--sans);
+  padding:max(28px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 56px max(16px,env(safe-area-inset-left))}
+.wrap{max-width:720px;margin:0 auto;display:grid;gap:28px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+h1{margin:0;font-size:28px;font-weight:600;letter-spacing:-.02em}
+.kicker{font:500 11.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+
+.device{background:linear-gradient(180deg,var(--frame-hi),var(--frame) 22%);border-radius:14px;padding:14px 14px 10px;
+  box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 12px 28px -16px rgba(0,0,0,.6)}
+.glass{background:var(--glass);padding:7px;border-radius:2px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25),inset 0 2px 6px rgba(0,0,0,.18)}
+.glass img{display:block;width:100%;aspect-ratio:250/122;image-rendering:pixelated;background:#dcdcd2}
+.devbar{display:flex;justify-content:space-between;gap:12px;font:10px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#7d8686;padding:8px 2px 0}
+.devbar .live::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:#71c4a2;margin-right:6px;vertical-align:1px}
+.devbar .live.stale::before{background:#7d8686}
+.now{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:-14px}
+.now p{margin:0;color:var(--muted);min-width:0}
+.now b{color:var(--fg);font-weight:500}
+
+section{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;display:grid;gap:16px}
+.sechead{display:flex;justify-content:space-between;align-items:center;gap:12px}
+h2{margin:0;font-size:18px;font-weight:600}
+.pill{font:500 11.5px var(--mono);letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.pill.on{color:var(--good)} .pill.off{color:var(--muted)}
+.lead{margin:0;color:var(--muted)}
+ol.steps{margin:0;padding:0;list-style:none;display:grid;gap:18px;counter-reset:s}
+ol.steps>li{display:grid;grid-template-columns:26px minmax(0,1fr);gap:4px 12px;counter-increment:s}
+ol.steps>li::before{content:counter(s);font:500 12px/24px var(--mono);text-align:center;width:24px;height:24px;border-radius:50%;border:1px solid var(--line);color:var(--muted)}
+ol.steps>li>div{display:grid;gap:8px;min-width:0}
+.steps p{margin:0}
+label{font-weight:500;font-size:13.5px}
+.field{display:grid;gap:6px}
+input{font:15px var(--sans);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%;min-width:0}
+input::placeholder{color:var(--muted);opacity:.8}
+input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:520px){.grid2{grid-template-columns:1fr}}
+button,.btn{font:500 14px var(--sans);border-radius:8px;padding:9px 16px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--fg);text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+button.primary,.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+button:disabled{opacity:.55;cursor:default}
+button.quiet{border-color:transparent;background:transparent;color:var(--muted);padding-inline:8px}
+code.copy{font:13px var(--mono);background:var(--bg);border:1px dashed var(--line);border-radius:6px;padding:6px 10px;display:inline-flex;gap:10px;align-items:center;overflow-wrap:anywhere}
+code.copy button{font:500 12px var(--sans);padding:2px 8px;white-space:nowrap;flex:none}
+.msg{margin:0;font-size:14px}
+.msg:empty{display:none}
+.msg.ok{color:var(--good)} .msg.err{color:var(--bad)}
+a{color:var(--accent)}
+footer{color:var(--muted);font-size:13px;text-align:center}
+[hidden]{display:none!important}
+@media (max-width:520px){.device{padding:9px 9px 6px;border-radius:10px}.glass{padding:4px}}
+@media (prefers-reduced-motion:no-preference){.glass img{transition:opacity .25s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Piholegotchi</h1>
+    <span class="kicker">Settings</span>
+  </header>
+
+  <div>
+    <div class="device">
+      <div class="glass"><img id="screen" src="/screen.png" alt="What the e-ink screen is showing right now"></div>
+      <div class="devbar"><span id="live" class="live">Live</span><span>250×122 · 1-bit</span></div>
+    </div>
+  </div>
+  <div class="now">
+    <p id="now">Loading…</p>
+    <button class="quiet" id="refresh" type="button">Refresh screen</button>
+  </div>
+
+  <section aria-labelledby="sp-h">
+    <div class="sechead"><h2 id="sp-h">Spotify</h2><span id="sp-pill" class="pill off">Not connected</span></div>
+
+    <div id="sp-connected" hidden>
+      <p class="lead">Connected. Sleeve shows whenever something's playing on your account.</p>
+      <div class="row" style="margin-top:12px"><button id="sp-disconnect" type="button">Disconnect</button></div>
+    </div>
+
+    <ol class="steps" id="sp-setup">
+      <li><div>
+        <p>Make an app at <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a>. Any name works. Tick <b>Web API</b> and add this redirect URI:</p>
+        <div><code class="copy"><span id="redirect">http://127.0.0.1:8888/callback</span><button type="button" data-copy="redirect">Copy</button></code></div>
+      </div></li>
+      <li><div class="field">
+        <label for="sp-client">Client ID from your app's settings</label>
+        <input id="sp-client" autocomplete="off" spellcheck="false" placeholder="e.g. 3f6a9c…">
+      </div></li>
+      <li><div>
+        <p>Sign in and approve. Spotify then sends you to a page that won't load. That's expected.</p>
+        <div class="row"><button class="primary" id="sp-start" type="button">Connect Spotify</button>
+          <a id="sp-link" class="btn" target="_blank" rel="noopener" hidden>Open Spotify sign-in</a></div>
+      </div></li>
+      <li><div class="field">
+        <label for="sp-paste">Paste the address of that page</label>
+        <input id="sp-paste" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:8888/callback?code=…">
+        <div class="row"><button id="sp-finish" type="button" disabled>Finish</button></div>
+      </div></li>
+    </ol>
+    <p class="msg" id="sp-msg" role="status"></p>
+  </section>
+
+  <section aria-labelledby="ag-h">
+    <div class="sechead"><h2 id="ag-h">AdGuard Home</h2><span id="ag-pill" class="pill off">Not set up</span></div>
+    <form id="ag-form" class="steps" style="display:grid;gap:14px">
+      <div class="field">
+        <label for="ag-url">Dashboard address, with the port</label>
+        <input id="ag-url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://192.168.1.20:3000">
+      </div>
+      <div class="grid2">
+        <div class="field"><label for="ag-user">Username</label><input id="ag-user" autocomplete="username" spellcheck="false"></div>
+        <div class="field"><label for="ag-pass">Password</label><input id="ag-pass" type="password" autocomplete="current-password"></div>
+      </div>
+      <div class="row">
+        <button class="primary" type="submit">Save</button>
+        <button type="button" id="ag-test">Test connection</button>
+      </div>
+      <p class="msg" id="ag-msg" role="status"></p>
+    </form>
+  </section>
+
+  <footer>Piholegotchi runs on this Pi. Settings are saved on the Pi only.</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let lastFrame = -1, pwSet = false, loaded = false;
+
+async function api(path, body){
+  const r = await fetch(path, {method: body ? 'POST' : 'GET',
+    headers: body ? {'Content-Type': 'application/json'} : {}, body: body ? JSON.stringify(body) : undefined});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Something went wrong (' + r.status + ').');
+  return j;
+}
+function say(el, text, ok){ el.textContent = text; el.className = 'msg' + (text ? (ok ? ' ok' : ' err') : ''); }
+function ago(s){ s = Math.max(0, Math.round(s)); return s < 60 ? s + 's ago' : Math.round(s/60) + ' min ago'; }
+
+async function poll(){
+  try{
+    const s = await api('/api/state');
+    if (s.frame !== lastFrame){ lastFrame = s.frame; $('screen').src = '/screen.png?f=' + s.frame; }
+    const what = s.screen === 'sleeve' ? 'Sleeve' : s.screen === 'muncher' ? 'Muncher' : 'Starting';
+    $('now').innerHTML = '';
+    const b = document.createElement('b'); b.textContent = 'Showing ' + what;
+    $('now').append(b, document.createTextNode((s.detail ? ' · ' + s.detail : '') + ' · updated ' + ago(s.now - s.updated)));
+    $('live').classList.toggle('stale', s.now - s.updated > 30);
+
+    const c = s.spotify_connected;
+    $('sp-pill').textContent = c ? 'Connected' : 'Not connected'; $('sp-pill').className = 'pill ' + (c ? 'on' : 'off');
+    $('sp-connected').hidden = !c; $('sp-setup').hidden = c;
+
+    const st = s.stats, cfg = s.config;
+    const ag = cfg.adguard_url ? (st && st.online ? 'Connected' : (st && st.note === 'BLOCKING IS OFF' ? 'Blocking off' : 'Can’t reach')) : 'Not set up';
+    $('ag-pill').textContent = ag; $('ag-pill').className = 'pill ' + (ag === 'Connected' ? 'on' : 'off');
+    pwSet = cfg.adguard_password_set;
+    if (!loaded){
+      loaded = true;
+      $('sp-client').value = cfg.spotify_client_id || '';
+      $('ag-url').value = cfg.adguard_url || '';
+      $('ag-user').value = cfg.adguard_username || '';
+    }
+    $('ag-pass').placeholder = pwSet ? 'Saved. Leave blank to keep it' : '';
+  }catch(e){ $('now').textContent = 'Can’t reach the Pi right now.'; $('live').classList.add('stale'); }
+}
+
+/* Spotify */
+$('sp-start').addEventListener('click', async () => {
+  const id = $('sp-client').value.trim();
+  if (!id){ say($('sp-msg'), 'Add your client ID first (step 2).'); $('sp-client').focus(); return; }
+  const w = window.open('', '_blank');
+  try{
+    const {url} = await api('/api/spotify/start', {client_id: id});
+    $('sp-link').href = url; $('sp-link').hidden = false;
+    if (w) w.location = url; else say($('sp-msg'), 'Your browser blocked the new tab. Use Open Spotify sign-in.', true);
+    $('sp-finish').disabled = false; $('sp-paste').focus();
+  }catch(e){ if (w) w.close(); say($('sp-msg'), e.message); }
+});
+$('sp-paste').addEventListener('input', () => { $('sp-finish').disabled = !$('sp-paste').value.trim(); });
+$('sp-finish').addEventListener('click', async () => {
+  $('sp-finish').disabled = true;
+  try{ await api('/api/spotify/finish', {pasted: $('sp-paste').value}); say($('sp-msg'), 'Connected. Play something to see Sleeve.', true); $('sp-paste').value = ''; poll(); }
+  catch(e){ say($('sp-msg'), e.message); $('sp-finish').disabled = false; }
+});
+$('sp-disconnect').addEventListener('click', async () => {
+  try{ await api('/api/spotify/disconnect', {}); say($('sp-msg'), 'Disconnected.', true); poll(); }catch(e){ say($('sp-msg'), e.message); }
+});
+
+/* AdGuard */
+async function adguard(save){
+  say($('ag-msg'), save ? 'Saving…' : 'Testing…', true);
+  try{
+    const r = await api('/api/adguard', {url: $('ag-url').value, username: $('ag-user').value, password: $('ag-pass').value, save});
+    say($('ag-msg'), (save ? 'Saved. ' : '') + r.message, r.ok);
+    if (save){ $('ag-pass').value = ''; poll(); }
+  }catch(e){ say($('ag-msg'), e.message); }
+}
+$('ag-form').addEventListener('submit', e => { e.preventDefault(); adguard(true); });
+$('ag-test').addEventListener('click', () => adguard(false));
+
+/* Misc */
+$('refresh').addEventListener('click', async () => { try{ await api('/api/refresh', {}); setTimeout(poll, 1500); }catch(e){} });
+document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', async () => {
+  const t = $(b.dataset.copy).textContent;
+  try{ await navigator.clipboard.writeText(t); b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 1500); }
+  catch{ const r = document.createRange(); r.selectNodeContents($(b.dataset.copy)); getSelection().removeAllRanges(); getSelection().addRange(r); }
+}));
+
+poll(); setInterval(poll, 5000);
+</script>
+</body>
+</html>

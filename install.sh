@@ -18,11 +18,6 @@ for f in __init__.py epdconfig.py epd2in13_V4.py; do
   curl -fsSL "$base/$f" -o "vendor/waveshare_epd/$f"
 done
 
-if [ ! -f /etc/piholegotchi.env ]; then
-  echo "==> Creating /etc/piholegotchi.env (edit it next)"
-  sudo install -m 600 piholegotchi.env.example /etc/piholegotchi.env
-fi
-
 echo "==> Installing the service"
 sudo tee /etc/systemd/system/piholegotchi.service >/dev/null <<UNIT
 [Unit]
@@ -33,8 +28,9 @@ Wants=network-online.target
 [Service]
 User=$USER
 WorkingDirectory=$HERE
-EnvironmentFile=/etc/piholegotchi.env
 ExecStart=/usr/bin/python3 -m piholegotchi
+# lets the settings page use port 80 without running as root
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 Restart=on-failure
 RestartSec=10
 
@@ -42,10 +38,8 @@ RestartSec=10
 WantedBy=multi-user.target
 UNIT
 sudo systemctl daemon-reload
-sudo systemctl enable piholegotchi
+sudo systemctl enable --now piholegotchi
+sudo systemctl restart piholegotchi
 
 echo
-echo "Done. Next:"
-echo "  1. sudo nano /etc/piholegotchi.env      (add your AdGuard Home address/login and Spotify client ID)"
-echo "  2. python3 -m piholegotchi.spotify_auth  (one-off Spotify sign-in)"
-echo "  3. sudo systemctl restart piholegotchi"
+echo "Done. Open http://$(hostname).local on your phone or laptop to finish setting up."

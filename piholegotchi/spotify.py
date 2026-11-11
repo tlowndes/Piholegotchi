@@ -13,13 +13,14 @@ from pathlib import Path
 import requests
 from PIL import Image
 
+from .config import CONFIG_DIR
 from .render import ART, Track, atkinson
 
 log = logging.getLogger(__name__)
 
 TOKEN_URL = "https://accounts.spotify.com/api/token"
 NOW_URL = "https://api.spotify.com/v1/me/player/currently-playing"
-TOKEN_FILE = Path.home() / ".config" / "piholegotchi" / "spotify.json"
+TOKEN_FILE = CONFIG_DIR / "spotify.json"
 
 
 class Spotify:

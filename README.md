@@ -19,6 +19,7 @@ The panel is 250 × 122 pixels, black or white, with no greys. Every screen is d
 - **Type.** Silkscreen for small caps labels, VT323 for secondary lines, Space Grotesk Bold for the big numbers and titles. All three hold up when thresholded to 1-bit.
 - **Album art.** Atkinson dithering. It keeps more white than Floyd–Steinberg, so covers stay light and readable on paper-white e-ink.
 - **Refresh.** E-ink flashes black and white on a full refresh. The progress bar uses quick partial refreshes every 10 seconds, and a full refresh only happens on a track change, a mood change, or every 30 partials to clear ghosting.
+- **Settings page.** A small web page on the Pi with a live view of the screen, so setup needs no SSH after install.
 - **Switching.** When Spotify stops, a paused track stays up for 2 minutes, then Muncher takes over.
 - **Stats.** Muncher counts what AdGuard Home blocked over its stats window (24 hours by default), checked every 5 minutes.
 
@@ -68,51 +69,25 @@ cd piholegotchi
 ./install.sh
 ```
 
-### 4. Make a Spotify app
+### 4. Open the settings page
 
-1. Go to [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard) and log in.
-2. **Create app.** Any name and description.
-3. **Redirect URI:** `http://127.0.0.1:8888/callback`
-4. Tick **Web API**, then save.
-5. Copy the **Client ID**.
+On your phone or laptop, go to **http://piholegotchi.local**. You'll see a live view of the screen, plus two sections:
 
-### 5. Add your details
+- **AdGuard Home:** the address you open AdGuard's dashboard on, including the port (e.g. `http://192.168.1.20:3000`), and your AdGuard login. Use **Test connection** to check it, then **Save**.
+- **Spotify:** follow the four steps on the page. You make a free developer app at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard), paste its client ID, then sign in. Spotify only sends sign-ins back to secure addresses or to the device itself, so you'll land on a page that doesn't load. Copy that page's address into the last box and press **Finish**.
 
-```sh
-sudo nano /etc/piholegotchi.env
-```
+You can come back to this page any time to change either.
 
-Fill in:
-
-- `ADGUARD_URL`: the address you open AdGuard Home's dashboard on, including the port, e.g. `http://192.168.1.20:3000`
-- `ADGUARD_USERNAME` and `ADGUARD_PASSWORD`: the dashboard login
-- `SPOTIFY_CLIENT_ID`: from step 4
-
-Save with Ctrl-O, Enter, Ctrl-X.
-
-### 6. Sign in to Spotify (once)
-
-```sh
-python3 -m piholegotchi.spotify_auth
-```
-
-It prints a link. Open it on your phone or laptop and approve. You'll land on a page that doesn't load, which is expected. Copy that page's full address and paste it back into the terminal.
-
-### 7. Start it
-
-```sh
-sudo systemctl restart piholegotchi
-```
-
-It starts by itself on every boot from now on.
+<img src="docs/screens/settings-page.png" width="500" alt="The settings page: a live view of the e-ink screen above Spotify and AdGuard Home settings">
 
 ## Handy commands
 
 ```sh
 journalctl -u piholegotchi -f       # watch the logs
+python3 -m piholegotchi.spotify_auth  # Spotify sign-in from the terminal, if you'd rather
 sudo systemctl stop piholegotchi    # stop (leaves a sleeping face on screen)
 python3 -m piholegotchi.preview     # render every screen to ./preview, no hardware needed
-python3 -m piholegotchi --png       # run the live loop, writing live.png instead of the panel
+python3 -m piholegotchi --png --port 8080   # run on a laptop: writes live.png, settings on :8080
 ```
 
 ## Credits
