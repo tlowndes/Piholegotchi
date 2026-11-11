@@ -1,9 +1,9 @@
 name: Build SD card image
 
+# Pushes to main (e.g. merging a PR) publish a new release.
+# Pushes to other branches just build, as a check.
 on:
   push:
-    tags: ["v*"]
-    branches-ignore: [main]
     paths: ["image/**", "piholegotchi/**", ".github/workflows/image.yml"]
   workflow_dispatch:
 
@@ -14,6 +14,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      TAG: v0.1.${{ github.run_number }}
+      PUBLISH: ${{ github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,11 +28,11 @@ jobs:
 
       - name: Build image
         env:
-          RELEASE_URL: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/piholegotchi.img.xz
+          RELEASE_URL: https://github.com/${{ github.repository }}/releases/download/v0.1.${{ github.run_number }}/piholegotchi.img.xz
         run: sudo --preserve-env=RELEASE_URL image/build.sh
 
       - name: Upload (branch builds)
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        if: env.PUBLISH != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: piholegotchi-image
@@ -37,12 +40,12 @@ jobs:
           compression-level: 0
           retention-days: 14
 
-      - name: Publish release (tags)
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Publish release (main)
+        if: env.PUBLISH == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" out/piholegotchi.img.xz out/piholegotchi.img.xz.sha256 \
+          gh release create "$TAG" --target "$GITHUB_SHA" out/piholegotchi.img.xz out/piholegotchi.img.xz.sha256 \
             out/piholegotchi.rpi-imager-manifest \
-            --title "Piholegotchi $GITHUB_REF_NAME" \
+            --title "Piholegotchi $TAG" \
             --notes "Download piholegotchi.rpi-imager-manifest and double-click it to open Raspberry Pi Imager with Piholegotchi ready to flash. See the README for the full steps."

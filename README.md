@@ -83,7 +83,7 @@ cd piholegotchi
 ./install.sh
 ```
 
-**Building the image yourself:** pushing a `v*` tag runs `.github/workflows/image.yml`, which runs `image/build.sh` and publishes a release. That takes Raspberry Pi OS Lite (32-bit), installs the Python packages in an emulated chroot, copies the app to `/opt/piholegotchi`, and runs it as its own `piholegotchi` user.
+**Building the image yourself:** every push to `main` runs `.github/workflows/image.yml`, which runs `image/build.sh` and publishes a release. That takes Raspberry Pi OS Lite (32-bit), installs the Python packages in an emulated chroot, copies the app to `/opt/piholegotchi`, and runs it as its own `piholegotchi` user.
 
 ## Handy commands
 
