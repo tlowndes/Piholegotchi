@@ -1,0 +1,51 @@
+name: Build SD card image
+
+# Pushes to main (e.g. merging a PR) publish a new release.
+# Pushes to other branches just build, as a check.
+on:
+  push:
+    paths: ["image/**", "piholegotchi/**", ".github/workflows/image.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TAG: v0.1.${{ github.run_number }}
+      PUBLISH: ${{ github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q qemu-user-binfmt parted xz-utils e2fsprogs
+          ls /proc/sys/fs/binfmt_misc/ | grep -i arm
+
+      - name: Build image
+        env:
+          RELEASE_URL: https://github.com/${{ github.repository }}/releases/download/v0.1.${{ github.run_number }}/piholegotchi.img.xz
+        run: sudo --preserve-env=RELEASE_URL image/build.sh
+
+      - name: Upload (branch builds)
+        if: env.PUBLISH != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: piholegotchi-image
+          path: out/
+          compression-level: 0
+          retention-days: 14
+
+      - name: Publish release (main)
+        if: env.PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" --target "$GITHUB_SHA" out/piholegotchi.img.xz out/piholegotchi.img.xz.sha256 \
+            out/piholegotchi.rpi-imager-manifest \
+            --title "Piholegotchi $TAG" \
+            --notes "Download piholegotchi.rpi-imager-manifest and double-click it to open Raspberry Pi Imager with Piholegotchi ready to flash. See the README for the full steps."
