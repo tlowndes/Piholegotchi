@@ -1,0 +1,3 @@
+# On the Pi these come from apt (see install.sh). For previews on a laptop:
+pillow>=9
+requests>=2.28
