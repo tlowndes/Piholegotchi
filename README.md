@@ -110,6 +110,12 @@ You can come back to this page any time to change any of it.
 
 <img src="docs/screens/settings-page.png" width="500" alt="The settings page: a live view of the e-ink screen above Spotify and AdGuard Home settings">
 
+### Wifi and backups
+
+The Pi Zero W's wifi likes to nap and not wake up. The image turns its power saving off and checks the router every two minutes; if it can't reach it three times running, it restarts the wifi. (Pis set up before this need a reflash to get it.)
+
+Before a reflash, go to **Device › Back up settings › Download backup**. After it, open the new settings page and use **Restore from file**, and everything comes back, Spotify sign-in included. The file holds your passwords, so keep it private.
+
 ## Other ways to install
 
 **On a Pi that's already running Raspberry Pi OS Lite:**
@@ -127,6 +133,7 @@ cd piholegotchi
 
 ```sh
 sudo journalctl -u piholegotchi -f  # watch the logs
+journalctl -t piholegotchi-wifi     # when the wifi watchdog had to restart wifi
 python3 -m piholegotchi.spotify_auth  # Spotify sign-in from the terminal, if you'd rather
 sudo systemctl stop piholegotchi    # stop (leaves a sleeping face on screen)
 python3 -m piholegotchi.preview     # render every screen to ./preview, no hardware needed

@@ -13,6 +13,7 @@ import re
 import secrets
 import threading
 import time
+from dataclasses import asdict, fields
 from datetime import date, datetime, timedelta
 from urllib.parse import parse_qs
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -125,7 +126,7 @@ def make_handler(state: "State"):
             if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
                 raise ValueError("expected JSON")
             n = int(self.headers.get("Content-Length") or 0)
-            return json.loads(self.rfile.read(min(n, 65536)) or b"{}")
+            return json.loads(self.rfile.read(min(n, 262144)) or b"{}")
 
         # ---------------------------------------------------- GET
 
@@ -169,6 +170,23 @@ def make_handler(state: "State"):
                     use["night"] = {"blocked": s.blocked if s and s.online else fake["night"]["blocked"],
                                     "until": Config.load().night_to}
                 return self._send(200, _png(draw(name, style, use, now), 2), "image/png")
+            if path == "/api/backup":                # everything needed to set up a fresh SD card again
+                out = {"piholegotchi_backup": 1, "made": datetime.now().isoformat(timespec="seconds"),
+                       "config": asdict(Config.load())}
+                try:
+                    out["spotify"] = json.loads(TOKEN_FILE.read_text())
+                except (OSError, ValueError):
+                    pass
+                body = json.dumps(out, indent=2).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Disposition",
+                                 f'attachment; filename="piholegotchi-settings-{date.today().isoformat()}.json"')
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(body)
+                return None
             if path == "/api/state":
                 cfg = Config.load()
                 with state.lock:
@@ -216,6 +234,24 @@ def make_handler(state: "State"):
                 return self._json({"error": "Send JSON."}, 400)
             path = self.path.split("?")[0]
             cfg = Config.load()
+
+            if path == "/api/restore":
+                if body.get("piholegotchi_backup") != 1 or not isinstance(body.get("config"), dict):
+                    return self._json({"error": "That isn't a Piholegotchi settings file."}, 400)
+                names = {f.name for f in fields(Config)}
+                try:
+                    new = Config(**{k: v for k, v in body["config"].items() if k in names})
+                except TypeError:
+                    return self._json({"error": "That settings file looks damaged."}, 400)
+                new.save()
+                if isinstance(body.get("spotify"), dict):
+                    TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
+                    tmp = TOKEN_FILE.with_suffix(".tmp")
+                    tmp.write_text(json.dumps(body["spotify"]))
+                    tmp.chmod(0o600)
+                    tmp.replace(TOKEN_FILE)
+                state.refresh_soon(stats_too=True)
+                return self._json({"ok": True})
 
             if path == "/api/adguard":
                 cfg.adguard_url = (body.get("url") or "").strip().rstrip("/")

@@ -1,0 +1,6 @@
+[Unit]
+Description=Keep Piholegotchi on wifi
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/piholegotchi-wifi

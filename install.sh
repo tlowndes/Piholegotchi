@@ -45,5 +45,16 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now piholegotchi
 sudo systemctl restart piholegotchi
 
+echo "==> Wifi: power saving off, and a watchdog that restarts it if the router goes missing"
+sudo apt-get install -y -q iw
+if [ -d /etc/NetworkManager ]; then
+  sudo install -d /etc/NetworkManager/conf.d
+  sudo install -m 644 image/wifi-powersave-off.conf /etc/NetworkManager/conf.d/piholegotchi-wifi-powersave-off.conf
+fi
+sudo install -m 755 image/piholegotchi-wifi.sh /usr/local/sbin/piholegotchi-wifi
+sudo install -m 644 image/piholegotchi-wifi.service image/piholegotchi-wifi.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now piholegotchi-wifi.timer
+
 echo
 echo "Done. Open http://$(hostname).local on your phone or laptop to finish setting up."

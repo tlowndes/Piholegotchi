@@ -354,6 +354,18 @@ pre.yaml{font:12.5px/1.5 var(--mono);background:var(--bg);border:1px dashed var(
     </label>
   </section>
 
+  <section data-tab="device" aria-labelledby="bk-h">
+    <div class="sechead"><h2 id="bk-h">Back up settings</h2></div>
+    <p class="lead">Save everything to a file: connections, passwords, screens and reminders. If you ever reflash the SD card, load it back here and you're set up again.</p>
+    <div class="row">
+      <a class="btn" id="bk-save" href="/api/backup" download>Download backup</a>
+      <button type="button" id="bk-load">Restore from file</button>
+      <input type="file" id="bk-file" accept=".json,application/json" hidden>
+    </div>
+    <p class="hint">The file has your passwords in it, so keep it somewhere private.</p>
+    <p class="msg" id="bk-msg" role="status"></p>
+  </section>
+
   <section data-tab="device" aria-labelledby="up-h">
     <div class="sechead"><h2 id="up-h">Software</h2><span id="ver" class="pill off">…</span></div>
     <p class="lead" id="up-text">Get the latest Piholegotchi from GitHub. Your settings are kept.</p>
@@ -888,6 +900,20 @@ $('up-install').addEventListener('click', async () => {
       if (Date.now() - started > 180000){ clearInterval(wait); say($('up-msg'), 'This is taking a while. Refresh the page in a minute.'); }
     }, 3000);
   }catch(e){ say($('up-msg'), e.message); $('up-install').disabled = false; }
+});
+
+/* Backup */
+$('bk-load').addEventListener('click', () => $('bk-file').click());
+$('bk-file').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try{
+    const data = JSON.parse(await f.text());
+    if (!confirm('Replace all settings on the Pi with this backup?')) return;
+    await api('/api/restore', data);
+    say($('bk-msg'), 'Restored. Reloading\u2026', true);
+    setTimeout(() => location.reload(), 1500);
+  }catch(err){ say($('bk-msg'), err instanceof SyntaxError ? 'That file isn\u2019t a settings backup.' : err.message); }
+  e.target.value = '';
 });
 
 /* Misc */
