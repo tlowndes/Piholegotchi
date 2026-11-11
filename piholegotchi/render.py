@@ -260,7 +260,7 @@ def muncher(s: Stats | None) -> Image.Image:
     if m == "asleep":
         c.text((96, 40), "z", vt(16))
         c.text((104, 30), "Z", vt(22))
-        c.text((x, 24), (s.note if s and s.note else "PI-HOLE IS DOWN"), pix())
+        c.text((x, 24), (s.note if s and s.note else "ADGUARD IS DOWN"), pix())
         c.text((x - 1, 53), "Zzz.", grot(30))
         c.text((x, 70), "Wake me up.", vt(20))
         c.rect(x, 82, 112, 1)

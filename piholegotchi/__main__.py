@@ -11,14 +11,14 @@ import os
 import signal
 import time
 
-from .pihole import PiHole
+from .adguard import AdGuard
 from .render import Stats, mood, muncher, sleeve
 from .spotify import Spotify
 
 log = logging.getLogger("piholegotchi")
 
 SPOTIFY_EVERY = 10        # seconds between Spotify checks (and progress bar updates)
-PIHOLE_EVERY = 300        # seconds between Pi-hole stat updates
+STATS_EVERY = 300         # seconds between AdGuard stat updates
 PAUSE_GRACE = 120         # keep showing a paused track this long before switching back
 FULL_EVERY = 30           # force a full refresh after this many partials (clears ghosting)
 
@@ -37,9 +37,10 @@ def main():
         panel = EPaper()
 
     spotify = Spotify(os.environ.get("SPOTIFY_CLIENT_ID", ""))
-    pihole = PiHole(os.environ.get("PIHOLE_URL", "http://127.0.0.1"), os.environ.get("PIHOLE_PASSWORD", ""))
+    adguard = AdGuard(os.environ.get("ADGUARD_URL", ""), os.environ.get("ADGUARD_USERNAME", ""),
+                      os.environ.get("ADGUARD_PASSWORD", ""))
     if not spotify.configured:
-        log.info("Spotify not set up yet, showing Pi-hole only")
+        log.info("Spotify not set up yet, showing ad stats only")
 
     stopping = False
 
@@ -56,7 +57,7 @@ def main():
     while not stopping:
         now = time.time()
         if now >= next_stats:
-            stats, next_stats = pihole.stats(), now + PIHOLE_EVERY
+            stats, next_stats = adguard.stats(), now + STATS_EVERY
 
         t = spotify.now_playing()
         if t and t.is_playing:

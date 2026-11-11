@@ -1,1 +1,1 @@
-"""Piholegotchi: a Pi-hole with an e-ink face."""
+"""Piholegotchi: an e-ink face for AdGuard Home and Spotify."""

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sets up Piholegotchi on a Raspberry Pi that already has Pi-hole installed.
+# Sets up Piholegotchi on a Raspberry Pi. Ad stats come from AdGuard Home elsewhere on the network.
 set -euo pipefail
 cd "$(dirname "$0")"
 HERE="$(pwd)"
@@ -27,7 +27,7 @@ echo "==> Installing the service"
 sudo tee /etc/systemd/system/piholegotchi.service >/dev/null <<UNIT
 [Unit]
 Description=Piholegotchi e-ink screen
-After=network-online.target pihole-FTL.service
+After=network-online.target
 Wants=network-online.target
 
 [Service]
@@ -46,6 +46,6 @@ sudo systemctl enable piholegotchi
 
 echo
 echo "Done. Next:"
-echo "  1. sudo nano /etc/piholegotchi.env      (add your Pi-hole password and Spotify client ID)"
+echo "  1. sudo nano /etc/piholegotchi.env      (add your AdGuard Home address/login and Spotify client ID)"
 echo "  2. python3 -m piholegotchi.spotify_auth  (one-off Spotify sign-in)"
 echo "  3. sudo systemctl restart piholegotchi"
