@@ -8,14 +8,17 @@ from pathlib import Path
 from PIL import Image
 
 log = logging.getLogger(__name__)
-VENDOR = Path(__file__).resolve().parent.parent / "vendor"
+# next to the app, or in the image's install when running an update from elsewhere
+VENDORS = [Path(__file__).resolve().parent.parent / "vendor", Path("/opt/piholegotchi/vendor")]
 
 
 class EPaper:
     """Full refresh clears ghosting (~2s flash). Partial is quick (~0.3s), no flash."""
 
     def __init__(self):
-        sys.path.insert(0, str(VENDOR))
+        for v in reversed(VENDORS):
+            if v.exists():
+                sys.path.insert(0, str(v))
         from waveshare_epd import epd2in13_V4  # type: ignore  # fetched by install.sh
 
         self.epd = epd2in13_V4.EPD()

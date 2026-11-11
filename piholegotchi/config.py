@@ -18,6 +18,7 @@ class Config:
     adguard_username: str = ""
     adguard_password: str = ""
     spotify_client_id: str = ""
+    flip: bool = False          # rotate the screen 180° (for upside-down mounting)
 
     @classmethod
     def load(cls) -> "Config":

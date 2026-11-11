@@ -29,7 +29,7 @@ jobs:
       - name: Build image
         env:
           RELEASE_URL: https://github.com/${{ github.repository }}/releases/download/v0.1.${{ github.run_number }}/piholegotchi.img.xz
-        run: sudo --preserve-env=RELEASE_URL image/build.sh
+        run: sudo --preserve-env=RELEASE_URL,GITHUB_SHA image/build.sh
 
       - name: Upload (branch builds)
         if: env.PUBLISH != 'true'

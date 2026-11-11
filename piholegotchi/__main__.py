@@ -11,6 +11,7 @@ import logging
 import os
 import signal
 import socket
+import sys
 import threading
 import time
 
@@ -53,6 +54,7 @@ class State:
         self.updated = 0.0
         self.stats_stale = True           # fetch AdGuard stats on the next pass
         self.error = ""                   # shown on the settings page
+        self.restart = False              # set after an update is installed
 
     def publish(self, img, screen, detail, stats):
         with self.lock:
@@ -105,7 +107,7 @@ def main():
     track, paused_since = None, None
     last_key, last_bytes, partials = None, None, 0
 
-    while not stopping:
+    while not stopping and not state.restart:
         now = time.time()
         fresh = Config.load()
         if fresh != cfg:                          # settings changed on the web page
@@ -140,11 +142,15 @@ def main():
             img, key = muncher(stats), ("muncher", mood(stats))
             detail = f"Mood: {mood(stats)}"
 
-        data = img.tobytes()
+        if cfg.flip:
+            shown, key = img.rotate(180), key + ("flipped",)
+        else:
+            shown = img
+        data = shown.tobytes()
         if data != last_bytes:
             full = key != last_key or partials >= FULL_EVERY
             try:
-                panel.show(img, full=full)
+                panel.show(shown, full=full)
                 partials = 0 if full else partials + 1
                 last_key, last_bytes = key, data
             except Exception as e:  # noqa: BLE001 - keep the settings page alive
@@ -156,9 +162,14 @@ def main():
         state.wake.wait(SPOTIFY_EVERY)
         state.wake.clear()
 
+    if state.restart:
+        log.info("restarting into the new version")
+        sys.exit(3)                       # systemd starts us again
+
     # e-ink keeps its image with no power, so leave a sleeping face behind
     try:
-        panel.show(muncher(Stats(0, 0, 0.0, online=False, note="SWITCHED OFF")), full=True)
+        off = muncher(Stats(0, 0, 0.0, online=False, note="SWITCHED OFF"))
+        panel.show(off.rotate(180) if cfg and cfg.flip else off, full=True)
         panel.sleep()
     except Exception:  # noqa: BLE001
         pass
