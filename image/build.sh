@@ -23,7 +23,9 @@ cleanup() {
 trap cleanup EXIT
 
 echo "==> Downloading Raspberry Pi OS Lite (32-bit)"
-curl -fL --retry 3 -o "$WORK/base.img.xz" "$BASE_URL"
+FINAL_URL=$(curl -fL --retry 3 -o "$WORK/base.img.xz" -w '%{url_effective}' "$BASE_URL")
+basename "$FINAL_URL" > "$OUT/base-image.txt"
+echo "    $(cat "$OUT/base-image.txt")"
 xz -dc "$WORK/base.img.xz" > "$WORK/piholegotchi.img"
 IMG="$WORK/piholegotchi.img"
 
@@ -81,5 +83,11 @@ trap - EXIT
 
 echo "==> Compressing"
 xz -T0 -6 -c "$IMG" > "$OUT/piholegotchi.img.xz"
+
+if [ -n "${RELEASE_URL:-}" ]; then
+  echo "==> Writing the Imager manifest"
+  python3 "$REPO/image/make_manifest.py" "$(cat "$OUT/base-image.txt")" "$IMG" "$OUT/piholegotchi.img.xz" \
+    "$RELEASE_URL" "$OUT/piholegotchi.rpi-imager-manifest"
+fi
 ( cd "$OUT" && sha256sum piholegotchi.img.xz > piholegotchi.img.xz.sha256 )
 ls -lh "$OUT"

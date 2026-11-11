@@ -42,36 +42,28 @@ The panel is 250 × 122 pixels, black or white, with no greys. Every screen is d
 
 ### 1. Flash the SD card
 
-1. Install [Raspberry Pi Imager](https://www.raspberrypi.com/software/) on your computer.
-2. **Device:** Raspberry Pi Zero (or Zero 2 W, whichever yours is).
-3. **OS:** Raspberry Pi OS (other) → **Raspberry Pi OS Lite (32-bit)**.
-4. When it offers to edit settings, say yes:
+1. Install [Raspberry Pi Imager](https://www.raspberrypi.com/software/) (version 2 or later).
+2. From the [latest release](https://github.com/tlowndes/piholegotchi/releases/latest), download **`piholegotchi.rpi-imager-manifest`**. It's a tiny file that tells Imager where the image is.
+3. Double-click it. Imager opens with Piholegotchi in its list. If double-clicking doesn't work, go to **App Options → Content Repository → Edit → Use custom file** and pick it.
+4. **Device:** Raspberry Pi Zero (or Zero 2 W). **OS:** Piholegotchi. **Storage:** your SD card.
+5. In the settings step:
    - Hostname: `piholegotchi`
    - Username and password: your choice
-   - Wi-Fi: your network name and password, country GB
-   - Services: turn on **SSH** with password login
-5. Write the card, put it in the Pi, power it up and give it a few minutes.
+   - Wi-Fi: your network name and password, country GB. The Pi Zero W only does 2.4 GHz.
+   - SSH: optional, only if you want to tinker
+6. Write the card.
 
-### 2. Log in
+> Why the manifest file? Imager only offers the Wi-Fi settings step for images it has details about. Picking the image through **Use custom** skips that step, and the Pi wouldn't know your Wi-Fi.
 
-From a terminal on your computer:
+### 2. Boot it
 
-```sh
-ssh yourname@piholegotchi.local
-```
+Put the card in and power up. After a couple of minutes the screen shows this:
 
-### 3. Install Piholegotchi
+<img src="docs/screens/setup.png" width="375" alt="Setup screen: the Muncher saying Set me up on your phone at piholegotchi.local, with the IP address below">
 
-```sh
-sudo apt-get install -y git
-git clone https://github.com/tlowndes/piholegotchi.git
-cd piholegotchi
-./install.sh
-```
+### 3. Open the settings page
 
-### 4. Open the settings page
-
-On your phone or laptop, go to **http://piholegotchi.local**. You'll see a live view of the screen, plus two sections:
+On your phone or laptop, go to **http://piholegotchi.local**. If that doesn't load (some Android phones can't do `.local` addresses), type the IP address from the screen instead. You'll see a live view of the screen, plus two sections:
 
 - **AdGuard Home:** the address you open AdGuard's dashboard on, including the port (e.g. `http://192.168.1.20:3000`), and your AdGuard login. Use **Test connection** to check it, then **Save**.
 - **Spotify:** follow the four steps on the page. You make a free developer app at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard), paste its client ID, then sign in. Spotify only sends sign-ins back to secure addresses or to the device itself, so you'll land on a page that doesn't load. Copy that page's address into the last box and press **Finish**.
@@ -80,10 +72,23 @@ You can come back to this page any time to change either.
 
 <img src="docs/screens/settings-page.png" width="500" alt="The settings page: a live view of the e-ink screen above Spotify and AdGuard Home settings">
 
+## Other ways to install
+
+**On a Pi that's already running Raspberry Pi OS Lite:**
+
+```sh
+sudo apt-get install -y git
+git clone https://github.com/tlowndes/piholegotchi.git
+cd piholegotchi
+./install.sh
+```
+
+**Building the image yourself:** pushing a `v*` tag runs `.github/workflows/image.yml`, which runs `image/build.sh` and publishes a release. That takes Raspberry Pi OS Lite (32-bit), installs the Python packages in an emulated chroot, copies the app to `/opt/piholegotchi`, and runs it as its own `piholegotchi` user.
+
 ## Handy commands
 
 ```sh
-journalctl -u piholegotchi -f       # watch the logs
+sudo journalctl -u piholegotchi -f  # watch the logs
 python3 -m piholegotchi.spotify_auth  # Spotify sign-in from the terminal, if you'd rather
 sudo systemctl stop piholegotchi    # stop (leaves a sleeping face on screen)
 python3 -m piholegotchi.preview     # render every screen to ./preview, no hardware needed
