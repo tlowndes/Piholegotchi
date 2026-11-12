@@ -1,7 +1,7 @@
 #!/bin/sh
 # Keeps the Pi on wifi. Runs as root every minute from piholegotchi-wifi.timer.
 # - Power saving off every time (a driver reload turns it back on).
-# - Can't reach the router 3 checks running: restart the wifi.
+# - Can't reach the router 3 checks running: restart the wifi (then reload the driver).
 # - Still nothing after 3 restarts: reboot (at most every 30 minutes).
 # Writes what it saw to /var/lib/piholegotchi/wifi.json for the settings page.
 DIR=/var/lib/piholegotchi
@@ -42,7 +42,10 @@ else
     fi
     restarts=$((restarts + 1)); fails=0
     logger -t piholegotchi-wifi "no router, restarting wifi (try $restarts)"
-    if command -v nmcli >/dev/null 2>&1; then
+    if [ "$restarts" -ge 2 ]; then           # the Zero W's wifi chip can lock up: reload its driver
+      modprobe -r brcmfmac_wcc brcmfmac 2>/dev/null; sleep 3; modprobe brcmfmac
+      sleep 10; iw dev wlan0 set power_save off 2>/dev/null
+    elif command -v nmcli >/dev/null 2>&1; then
       nmcli radio wifi off; sleep 5; nmcli radio wifi on
     else
       ip link set wlan0 down; sleep 5; ip link set wlan0 up
