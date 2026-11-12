@@ -26,7 +26,7 @@ from . import schedule, spotify_auth, updater, weather
 from .calendar_feed import CalendarSource, clean_url
 from .adguard import AdGuard
 from .homeassistant import MAX_ENTITIES, HomeAssistant
-from .config import DEFAULT_SCREENS, Config
+from .config import CONFIG_DIR, DEFAULT_SCREENS, Config
 from .screens import STYLES, draw, samples
 from .server import Glances
 from .spotify import TOKEN_FILE
@@ -56,6 +56,18 @@ def _local_ip() -> str:
             return s.getsockname()[0]
     except OSError:
         return ""
+
+
+def _wifi_signal() -> int | None:
+    """Wifi signal in dBm from /proc/net/wireless (readable without root), or None."""
+    try:
+        for line in Path("/proc/net/wireless").read_text().splitlines()[2:]:
+            name, _, rest = line.partition(":")
+            if name.strip().startswith("wl"):
+                return int(float(rest.split()[2]))
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
 
 
 KINDS = ("plant", "pet", "other")
@@ -221,6 +233,14 @@ def make_handler(state: "State"):
                     out["spotify_top"] = False
                 out["ip"] = _local_ip()
                 out["version"] = updater.installed()[:7]
+                try:                                    # written by the wifi watchdog (image/piholegotchi-wifi.sh)
+                    out["wifi"] = json.loads((CONFIG_DIR / "wifi.json").read_text())
+                except (OSError, ValueError):
+                    out["wifi"] = None
+                sig = _wifi_signal()                    # live, so it works before the watchdog's first check too
+                if sig is not None:
+                    out["wifi"] = {**(out["wifi"] or {"ok": True, "drops": 0, "checked": time.time(), "partial": True}),
+                                   "signal": sig}
                 out["update"] = dict(update_status)
                 return self._json(out)
             self._send(404, b"not found", "text/plain")

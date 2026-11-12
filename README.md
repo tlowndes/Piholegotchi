@@ -112,7 +112,7 @@ You can come back to this page any time to change any of it.
 
 ### Wifi and backups
 
-The Pi Zero W's wifi likes to nap and not wake up. The image turns its power saving off and checks the router every two minutes; if it can't reach it three times running, it restarts the wifi. (Pis set up before this need a reflash to get it.)
+The Pi Zero W's wifi likes to nap and not wake up. The image turns its power saving off and checks the router every minute. If it can't reach it three times running, it restarts the wifi; if three restarts don't fix it, it reboots (at most every 30 minutes). **Device › Wifi** shows the signal strength and every drop-out, so you can tell a weak signal from a flaky router. (Pis set up before this need a reflash to get it.)
 
 Before a reflash, go to **Device › Back up settings › Download backup**. After it, open the new settings page and use **Restore from file**, and everything comes back, Spotify sign-in included. The file holds your passwords, so keep it private.
 
