@@ -1,9 +1,9 @@
 [Unit]
-Description=Check Piholegotchi's wifi every 2 minutes
+Description=Check Piholegotchi's wifi every minute
 
 [Timer]
-OnBootSec=2min
-OnUnitActiveSec=2min
+OnBootSec=1min
+OnUnitActiveSec=1min
 
 [Install]
 WantedBy=timers.target

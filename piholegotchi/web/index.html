@@ -112,6 +112,9 @@ button.x{padding:8px 10px;color:var(--muted)}
 section.tab-off{display:none}
 .scr .more{font-size:13px;color:var(--accent);text-decoration:none;justify-self:start}
 .scr .more:hover{text-decoration:underline}
+dl.wf{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:12px 0 0;font-size:14px}
+dl.wf dt{color:var(--muted)}
+dl.wf dd{margin:0}
 section h3{font:600 16px var(--sans);margin:22px 0 6px}
 .ents{display:grid;gap:6px;max-height:320px;overflow:auto;padding:4px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
 .ent{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,9em);gap:10px;align-items:center;padding:6px 8px;border-radius:8px}
@@ -354,6 +357,12 @@ pre.yaml{font:12.5px/1.5 var(--mono);background:var(--bg);border:1px dashed var(
     </label>
   </section>
 
+  <section data-tab="device" aria-labelledby="wf-h">
+    <div class="sechead"><h2 id="wf-h">Wifi</h2><span id="wf-pill" class="pill off">…</span></div>
+    <p class="lead" id="wf-text">The Pi checks it can reach your router every minute. If it can't, it restarts its wifi, and reboots if that doesn't work.</p>
+    <dl class="wf" id="wf-facts"></dl>
+  </section>
+
   <section data-tab="device" aria-labelledby="bk-h">
     <div class="sechead"><h2 id="bk-h">Back up settings</h2></div>
     <p class="lead">Save everything to a file: connections, passwords, screens and reminders. If you ever reflash the SD card, load it back here and you're set up again.</p>
@@ -459,6 +468,7 @@ async function poll(){
     pwSet = cfg.adguard_password_set;
     paintPause(cfg, st, s.now);
     paintFocus(s.focus);
+    paintWifi(s.wifi, s.now);
     $('ver').textContent = s.version ? 'Version ' + s.version : 'Version unknown';
     if (s.update && s.update.message){ say($('up-msg'), s.update.message, !/failed/i.test(s.update.message)); }
     $('wx-pill').textContent = cfg.weather_name ? cfg.weather_name : 'Not set up'; $('wx-pill').className = 'pill ' + (cfg.weather_name ? 'on' : 'off');
@@ -901,6 +911,28 @@ $('up-install').addEventListener('click', async () => {
     }, 3000);
   }catch(e){ say($('up-msg'), e.message); $('up-install').disabled = false; }
 });
+
+/* Wifi */
+function paintWifi(w, now){
+  const facts = $('wf-facts'); facts.innerHTML = '';
+  if (!w){ $('wf-pill').textContent = 'No check yet'; $('wf-pill').className = 'pill off'; return; }
+  const sig = w.signal;
+  const strength = sig == null ? '' : sig >= -60 ? 'Strong' : sig >= -70 ? 'OK' : sig >= -78 ? 'Weak' : 'Very weak';
+  $('wf-pill').textContent = w.ok ? (strength || 'Connected') : 'Dropped'; $('wf-pill').className = 'pill ' + (w.ok && sig != null && sig >= -70 ? 'on' : 'off');
+  const when = t => { const d = new Date(t * 1000); return d.toLocaleString('en-GB', {weekday:'short', hour:'2-digit', minute:'2-digit'}); };
+  const rows = [];
+  if (w.ssid) rows.push(['Network', w.ssid]);
+  if (sig != null) rows.push(['Signal', sig + ' dBm (' + strength.toLowerCase() + ')' + (sig < -70 ? '. Try moving the Pi closer to the router.' : '')]);
+  if (w.partial) rows.push(['Drop-outs', 'Not tracked yet. The wifi check that counts them comes with the latest SD card image.']);
+  else rows.push(['Drop-outs', w.drops ? w.drops + ' since ' + new Date(w.since * 1000).toLocaleDateString('en-GB', {day:'numeric', month:'short'}) : 'None']);
+  if (w.drops && w.last_drop){
+    const back = w.last_back > w.last_drop ? ', back after ' + Math.max(1, Math.round((w.last_back - w.last_drop) / 60)) + ' min' : '';
+    rows.push(['Last one', when(w.last_drop) + back]);
+  }
+  if (w.reboots) rows.push(['Reboots', w.reboots + ' (when restarting the wifi didn\u2019t work)']);
+  if (!w.partial) rows.push(['Checked', ago(now - w.checked)]);
+  for (const [k, v] of rows){ const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; facts.append(dt, dd); }
+}
 
 /* Backup */
 $('bk-load').addEventListener('click', () => $('bk-file').click());
