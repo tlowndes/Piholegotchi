@@ -1,0 +1,32 @@
+{
+  "name": "piholegotchi-desktop",
+  "productName": "Piholegotchi",
+  "version": "2.0.0",
+  "description": "Muncher, the ad-eating desk pet, for a Windows touchscreen.",
+  "main": "main/main.js",
+  "author": "Tom Lowndes",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "demo": "electron . --demo",
+    "test": "node --test test/*.test.js",
+    "dist": "electron-builder --win --publish never"
+  },
+  "dependencies": {
+    "node-ical": "0.27.5",
+    "systeminformation": "5.33.19"
+  },
+  "devDependencies": {
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "uk.co.tomlowndes.piholegotchi",
+    "productName": "Piholegotchi",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["main/**", "renderer/**", "preload.js", "package.json"],
+    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "icon": "build/icon.png" },
+    "nsis": { "oneClick": true, "perMachine": false, "artifactName": "Piholegotchi-Setup-${version}.exe" }
+  }
+}

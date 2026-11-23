@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Piholegotchi</title>
+<link rel="stylesheet" href="widget.css">
+</head>
+<body class="side-left">
+  <div id="panel" hidden role="dialog" aria-label="Muncher's panel">
+    <div class="pbar">
+      <div class="name" id="pname"></div>
+      <div class="dots" id="dots"></div>
+      <button class="ibtn" id="prev" aria-label="Previous screen"><svg width="14" height="14" viewBox="0 0 7 7" shape-rendering="crispEdges"><path fill="currentColor" d="M4 0h1v1H4zM3 1h1v1H3zM2 2h1v1H2zM1 3h1v1H1zM2 4h1v1H2zM3 5h1v1H3zM4 6h1v1H4z"/></svg></button>
+      <button class="ibtn" id="next" aria-label="Next screen"><svg width="14" height="14" viewBox="0 0 7 7" shape-rendering="crispEdges"><path fill="currentColor" d="M2 0h1v1H2zM3 1h1v1H3zM4 2h1v1H4zM5 3h1v1H5zM4 4h1v1H4zM3 5h1v1H3zM2 6h1v1H2z"/></svg></button>
+      <button class="ibtn" id="gear" aria-label="Settings"><svg width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><path fill="currentColor" d="M3 0h2v1H3zM1 1h1v1H1zM6 1h1v1H6zM2 2h4v4H2zM0 3h1v2H0zM7 3h1v2H7zM1 6h1v1H1zM6 6h1v1H6zM3 7h2v1H3z"/><path fill="#dedcd2" d="M3 3h2v2H3z"/></svg></button>
+      <button class="ibtn" id="close" aria-label="Close the panel"><svg width="14" height="14" viewBox="0 0 7 7" shape-rendering="crispEdges"><path fill="currentColor" d="M0 0h1v1H0zM6 0h1v1H6zM1 1h1v1H1zM5 1h1v1H5zM2 2h1v1H2zM4 2h1v1H4zM3 3h1v1H3zM2 4h1v1H2zM4 4h1v1H4zM1 5h1v1H1zM5 5h1v1H5zM0 6h1v1H0zM6 6h1v1H6z"/></svg></button>
+    </div>
+    <div id="track"></div>
+  </div>
+  <div id="bubble" hidden role="button" tabindex="0"><div class="t" id="bt"></div><div class="m" id="bm"></div><button class="x" id="bx" aria-label="Dismiss">X</button></div>
+  <div id="pet" role="button" tabindex="0" aria-label="Muncher. Tap to open the panel, hold to move him"><canvas id="petc" width="140" height="100"></canvas></div>
+  <script src="muncher.js"></script>
+  <script src="demo.js"></script>
+  <script src="screens.js"></script>
+  <script src="widget.js"></script>
+</body>
+</html>
