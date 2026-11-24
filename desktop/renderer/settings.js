@@ -71,6 +71,25 @@
     if (r.ok) { cfg = await pg.getConfig(); fillAll(); }
   });
 
+  // ---------------------------------------------------------------- updates
+  async function checkUpdates() {
+    say($('#updMsg'), 'Checking GitHub…');
+    $('#updInstall').hidden = true;
+    const r = await pg.tool('update:check');
+    say($('#updMsg'), r.message, !r.ok);
+    if (r.current) $('#version').textContent = `This is version ${r.current}.`;
+    if (r.newer) { $('#updInstall').hidden = false; $('#updInstall').textContent = `Install ${r.latest.version}`; }
+  }
+  $('#updCheck').addEventListener('click', checkUpdates);
+  $('#updInstall').addEventListener('click', async () => {
+    $('#updInstall').disabled = $('#updCheck').disabled = true;
+    say($('#updMsg'), 'Downloading… this takes a minute.');
+    const r = await pg.tool('update:install');
+    say($('#updMsg'), r.message, !r.ok);
+    $('#updInstall').disabled = $('#updCheck').disabled = false;
+  });
+  pg.onState((s) => { if (s && s.version && !$('#version').textContent) $('#version').textContent = `This is version ${s.version}.`; });
+
   // ---------------------------------------------------------------- muncher
   async function displays() {
     const list = await pg.tool('displays');
@@ -212,7 +231,7 @@
     cfg = await pg.getConfig();
     fillAll();
     show(location.hash.slice(1) || 'welcome');
-    displays(); addrs();
+    displays(); addrs(); checkUpdates();
     if (cfg.ha_url && cfg.ha_token_set) $('#haConnect').click();
   })();
 })();

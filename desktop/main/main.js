@@ -7,6 +7,8 @@ const { Store } = require('./store');
 const { Hub } = require('./hub');
 const { WinHelper } = require('./win/helper');
 const { startServer } = require('./server');
+const updates = require('./updates');
+const { spawn } = require('child_process');
 const { AdGuard } = require('./sources/adguard');
 const { Glances } = require('./sources/glances');
 const { HomeAssistant } = require('./sources/homeassistant');
@@ -118,6 +120,9 @@ function openSettings(tab) {
 }
 
 function sendState(s) {
+  // JSON round trip: anything that can't cross to the window (a stray Promise, a function) is dropped,
+  // instead of the whole update failing and Muncher sitting there asleep
+  s = JSON.parse(JSON.stringify(s));
   for (const w of [win, settingsWin]) if (w && !w.isDestroyed()) w.webContents.send('state', s);
 }
 
@@ -128,6 +133,7 @@ function buildTray() {
     { label: 'Open the panel', click: () => { win.showInactive(); win.webContents.send('open', 'open'); } },
     { label: 'Settings', click: () => openSettings() },
     { label: win && win.isVisible() ? 'Hide Muncher' : 'Show Muncher', click: () => { if (win.isVisible()) win.hide(); else win.showInactive(); tray.setContextMenu(menu()); } },
+    { label: 'Check for updates', click: () => openSettings('welcome') },
     { label: 'Put Muncher back in the corner', click: () => { store.set({ pos: null }); placePet(); applyLayout(); } },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },
@@ -189,8 +195,26 @@ async function tool(name, a = {}) {
     case 'party': await hub.act('ads:party'); return { ok: true };
     case 'corner': store.set({ pos: null }); placePet(); applyLayout(); return { ok: true };
     case 'open': shell.openExternal(a.url); return { ok: true };
+    case 'update:check': return checkUpdates();
+    case 'update:install': {
+      const r = await updates.check(app.getVersion());
+      if (!r.newer) return { ok: false, message: r.message };
+      if (!app.isPackaged || process.platform !== 'win32') return { ok: false, message: 'Running from source: pull the repo instead.' };
+      const exe = await updates.download(r.latest, app.getPath('temp'));
+      // quiet install over the top, then start again; the installer waits for us to close
+      spawn(exe, ['/S', '--force-run'], { detached: true, stdio: 'ignore' }).unref();
+      setTimeout(() => app.quit(), 400);
+      return { ok: true, message: `Installing ${r.latest.version}. Muncher will be back in a moment.` };
+    }
     default: throw new Error(`Unknown tool ${name}`);
   }
+}
+
+async function checkUpdates() {
+  const r = await updates.check(app.getVersion());
+  hub.s.update = r.newer ? { version: r.latest.version } : null;
+  hub.emit();
+  return r;
 }
 
 function refreshAll() {
@@ -204,11 +228,17 @@ app.whenReady().then(() => {
   store = new Store(path.join(app.getPath('userData'), DEMO ? 'demo' : 'data'), safeStorage);
   helper = DEMO ? { ok: false, call: async () => null, stop() {} } : new WinHelper(app.getPath('temp'));
   hub = new Hub({ store, helper, electron: { clipboard, powerMonitor, shell }, onState: sendState });
+  hub.version = app.getVersion();
   placePet();
   createWidget();
   buildTray();
   loginItem();
-  if (!DEMO) { hub.start(); server = startServer(hub, +store.get('api_port') || 8787); }
+  if (!DEMO) {
+    hub.start(); server = startServer(hub, +store.get('api_port') || 8787);
+    const quietCheck = () => checkUpdates().catch((e) => console.warn('update check', e.message));
+    setTimeout(quietCheck, 60e3);
+    setInterval(quietCheck, 6 * 3600e3);
+  }
   if (!DEMO && !store.get('adguard_url') && !store.get('weather_place')) setTimeout(() => openSettings('welcome'), 1500);
 
   screen.on('display-removed', () => { placePet(); applyLayout(); });

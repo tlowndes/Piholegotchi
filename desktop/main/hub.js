@@ -168,10 +168,11 @@ class Hub {
     if (v) this.s.sound = { master: v.master, muted: v.muted, sessions: (v.sessions || []).filter((x) => x.name !== 'Piholegotchi') };
   }
 
-  pollClipboard() {
+  async pollClipboard() {
     if (this.cfg().clipboard === false) return;
-    const t = this.el.clipboard.readText();
-    if (!t || t === this.lastClip) return;
+    // newer Electron returns a Promise here; a Promise in the state stops it reaching the widget at all
+    const t = await this.el.clipboard.readText();
+    if (typeof t !== 'string' || !t || t === this.lastClip) return;
     this.lastClip = t;
     if (t.length > 2000) return;
     this.s.clip = [t, ...this.s.clip.filter((x) => x !== t)].slice(0, 5);
@@ -209,8 +210,8 @@ class Hub {
     } else { this.s.drift = false; this.driftSince = 0; }
   }
 
-  pollWellbeing() {
-    const idle = this.el.powerMonitor.getSystemIdleTime();      // seconds
+  async pollWellbeing() {
+    const idle = +(await this.el.powerMonitor.getSystemIdleTime()) || 0;      // seconds
     const now = Date.now();
     if (idle >= 300) this.activeSince = now;
     const after = +this.cfg().break_after || 0;
@@ -276,6 +277,7 @@ class Hub {
     for (const r of reminders(c.reminders, now).filter((x) => x.due)) add(`rem:${r.id}:${r.at}`, r.kind === 'plant' ? 'PLANTS' : r.kind === 'pet' ? 'PETS' : 'REMINDER', `${r.title}.`, 'rem', 3);
     if (s.network.fresh && t - s.network.fresh.at < 60 * MIN) add(`net:${s.network.fresh.ip}`, 'NEW ON YOUR WIFI', 'Who’s this, then?', 'net', 3, 'sus');
     if (s.ads?.mood === 'party') add(`party:${dayKey(now)}`, 'NEW RECORD', `${(s.ads.today || 0).toLocaleString('en-GB')} ads today. Party!`, 'ads', 2);
+    if (s.update && !this.dismissed.has(`upd:${s.update.version}`)) out.push({ id: `upd:${s.update.version}`, title: 'UPDATE READY', text: `Version ${s.update.version} is out. Tap to install.`, settings: 'welcome', prio: 1 });
     if (now.getDay() === 1 && now.getHours() >= 8 && now.getHours() < 13) add(`rpt:${this.life.report(now).key}`, `WEEK ${this.life.report(now).week}`, `You got ${this.life.report(now).grade}.`, 'rpt', 1);
     if (s.meeting) return [];
     if (c.night && isNight(now, c.night_from, c.night_to)) return out.filter((n) => n.prio >= 9);
@@ -303,6 +305,7 @@ class Hub {
       report: this.life.report(now),
       water: { ml: this.life.day().water_ml, goal: c.water_goal },
       captures: this.s.captures,
+      version: this.version || '',
       configured: {
         ads: this.adguard.configured, spotify: this.spotify.configured, weather: !!c.weather_place, server: this.glances.configured,
         calendar: !!c.calendar_url, home: this.ha.configured, door: this.ha.configured && !!(c.ha_doorbell || c.ha_camera),

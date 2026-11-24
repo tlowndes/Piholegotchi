@@ -183,6 +183,7 @@
     const b = say || showing;
     if (showing && !say) { dismissed.add(showing.id); act('dismiss', { id: showing.id }); }
     say = null;
+    if (b && b.settings) { showing = null; hideBubble(); return api.openSettings(b.settings); }
     openPanel(b && b.screen);
   });
   $('bx').addEventListener('click', (e) => {
