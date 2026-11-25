@@ -1,6 +1,6 @@
 // Piholegotchi v2: Muncher on your touchscreen.
-// One small always-on-top window holds Muncher; it grows to show a speech bubble or the panel.
-const { app, BrowserWindow, Tray, Menu, ipcMain, screen, shell, dialog, clipboard, powerMonitor, safeStorage, nativeImage } = require('electron');
+// One small always-on-top window holds Muncher on the screen edge; it grows to show a speech bubble or the drawer.
+const { app, BrowserWindow, Tray, Menu, ipcMain, screen, shell, dialog, clipboard, powerMonitor, safeStorage, nativeImage, nativeTheme } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { Store } = require('./store');
@@ -16,13 +16,13 @@ const { HomeAssistant } = require('./sources/homeassistant');
 const DEMO = process.argv.includes('--demo');
 const ROOT = path.join(__dirname, '..');
 const ICON = path.join(ROOT, 'renderer', 'icon.png');
-const PANEL_W = 720, PANEL_H = 340, GAP = 12, BUBBLE_H = 120, BUBBLE_W = 300;
+const DRAWER_W = 880, DRAWER_H = 480, BUBBLE_W = 272;
 
 if (!app.requestSingleInstanceLock()) app.quit();
 
 let store, hub, helper, win, settingsWin, tray, server;
-let mode = 'pet';
-let pet = null;          // {x, y} top-left of Muncher, in screen pixels
+let mode = 'tucked';     // tucked (peeking from the edge), nudge (peeking with a speech bubble), open (drawer out)
+let handleY = null;      // top of Muncher's handle on the edge, in screen pixels
 
 // ---------------------------------------------------------------- where Muncher lives
 function display() {
@@ -34,60 +34,48 @@ function display() {
     || screen.getPrimaryDisplay();
 }
 
-function petSize() {
-  const s = +store.get('pet_scale') || 2;
-  return { w: 140 * s, h: 100 * s };
+const edge = () => (store.get('edge') === 'left' ? 'left' : 'right');
+
+function handleSize() {
+  const k = +store.get('pet_scale') || 2;
+  return { w: 33 * k, h: 48 * k, k };
 }
 
-function panelSize() {
+function drawerSize(d) {
   const z = +store.get('zoom') || 1;
-  return { w: Math.round(PANEL_W * z), h: Math.round(PANEL_H * z) };
+  return { w: Math.min(Math.round(DRAWER_W * z), d.width - 40), h: Math.min(Math.round(DRAWER_H * z), d.height - 24) };
 }
 
 function placePet() {
   const d = display().workArea;
-  const { w, h } = petSize();
+  const { h } = handleSize();
   const p = store.get('pos');
-  pet = p && typeof p.x === 'number'
-    ? { x: d.x + p.x, y: d.y + p.y }
-    : { x: d.x + d.width - w - 16, y: d.y + d.height - h - 8 };
+  handleY = p && typeof p.y === 'number' ? d.y + p.y : d.y + d.height - h - 140;
   clampPet();
 }
 
 function clampPet() {
-  const { w, h } = petSize();
-  const d = screen.getDisplayNearestPoint({ x: Math.round(pet.x + w / 2), y: Math.round(pet.y + h / 2) }).workArea;
-  pet.x = Math.min(Math.max(pet.x, d.x - w * 0.3), d.x + d.width - w * 0.7);
-  pet.y = Math.min(Math.max(pet.y, d.y), d.y + d.height - h);
+  const d = display().workArea;
+  const { h } = handleSize();
+  handleY = Math.min(Math.max(handleY, d.y + 8), d.y + d.height - h - 8);
 }
 
 function bounds() {
-  const { w, h } = petSize();
-  const d = screen.getDisplayNearestPoint({ x: Math.round(pet.x + w / 2), y: Math.round(pet.y + h / 2) }).workArea;
-  const right = pet.x + w / 2 > d.x + d.width / 2;          // Muncher on the right: things open to his left
-  if (mode === 'panel') {
-    const p = panelSize();
-    const W = p.w + GAP + w, H = Math.max(p.h, h);
-    let x = right ? pet.x + w - W : pet.x;
-    let y = Math.max(d.y, pet.y + h - H);
-    x = Math.min(Math.max(x, d.x), d.x + d.width - W);
-    return { b: { x: Math.round(x), y: Math.round(y), width: W, height: H }, side: right ? 'left' : 'right' };
-  }
-  if (mode === 'bubble') {
-    const W = Math.max(w, BUBBLE_W), H = h + BUBBLE_H;
-    return { b: { x: Math.round(right ? pet.x + w - W : pet.x), y: Math.round(pet.y - BUBBLE_H), width: W, height: H }, side: right ? 'left' : 'right' };
-  }
-  return { b: { x: Math.round(pet.x), y: Math.round(pet.y), width: w, height: h }, side: right ? 'left' : 'right' };
+  const d = display().workArea;
+  const { w: hw, h: hh } = handleSize();
+  const at = (W, H, y) => ({ x: edge() === 'right' ? d.x + d.width - W : d.x, y: Math.round(Math.min(Math.max(y, d.y), d.y + d.height - H)), width: W, height: H });
+  if (mode === 'open') { const s = drawerSize(d); return at(s.w, s.h, handleY + hh / 2 - s.h / 2); }
+  if (mode === 'nudge') { const H = Math.max(hh, 150); return at(hw + BUBBLE_W, H, handleY + hh / 2 - H / 2); }
+  return at(hw, hh, handleY);
 }
 
 function applyLayout() {
   if (!win) return;
-  const { b, side } = bounds();
+  const b = bounds();
   win.setBounds(b);
-  const { w, h } = petSize();
-  const p = panelSize();
-  win.webContents.send('layout', { mode, side, petW: w, petH: h, scale: +store.get('pet_scale') || 2,
-    panelW: p.w, panelH: p.h, zoom: +store.get('zoom') || 1, winW: b.width, winH: b.height });
+  const { w, h, k } = handleSize();
+  win.webContents.send('layout', { mode, edge: edge(), handleW: w, handleH: h, k, zoom: +store.get('zoom') || 1,
+    winW: b.width, winH: b.height, handleTop: Math.round(handleY - b.y) });
 }
 
 // ---------------------------------------------------------------- windows
@@ -111,7 +99,7 @@ function openSettings(tab) {
   const prim = screen.getPrimaryDisplay().workArea;
   settingsWin = new BrowserWindow({
     width: 940, height: 760, x: prim.x + Math.round((prim.width - 940) / 2), y: prim.y + Math.round((prim.height - 760) / 2),
-    title: 'Piholegotchi settings', icon: ICON, backgroundColor: '#dedcd2', autoHideMenuBar: true,
+    title: 'Piholegotchi settings', icon: ICON, backgroundColor: nativeTheme.shouldUseDarkColors ? '#17181e' : '#eef0f4', autoHideMenuBar: true,
     webPreferences: { preload: path.join(ROOT, 'preload.js'), contextIsolation: true, nodeIntegration: false },
   });
   settingsWin.loadFile(path.join(ROOT, 'renderer', 'settings.html'), { hash: tab || '' });
@@ -130,11 +118,11 @@ function buildTray() {
   tray = new Tray(nativeImage.createFromPath(ICON).resize({ width: 16, height: 16 }));
   tray.setToolTip('Piholegotchi');
   const menu = () => Menu.buildFromTemplate([
-    { label: 'Open the panel', click: () => { win.showInactive(); win.webContents.send('open', 'open'); } },
+    { label: 'Slide the drawer out', click: () => { win.showInactive(); win.webContents.send('open', 'open'); } },
     { label: 'Settings', click: () => openSettings() },
     { label: win && win.isVisible() ? 'Hide Muncher' : 'Show Muncher', click: () => { if (win.isVisible()) win.hide(); else win.showInactive(); tray.setContextMenu(menu()); } },
     { label: 'Check for updates', click: () => openSettings('welcome') },
-    { label: 'Put Muncher back in the corner', click: () => { store.set({ pos: null }); placePet(); applyLayout(); } },
+    { label: 'Put Muncher back in his spot', click: () => { store.set({ pos: null }); placePet(); applyLayout(); } },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },
   ]);
@@ -229,6 +217,7 @@ app.whenReady().then(() => {
   helper = DEMO ? { ok: false, call: async () => null, stop() {} } : new WinHelper(app.getPath('temp'));
   hub = new Hub({ store, helper, electron: { clipboard, powerMonitor, shell }, onState: sendState });
   hub.version = app.getVersion();
+  nativeTheme.themeSource = ['light', 'dark'].includes(store.get('theme')) ? store.get('theme') : 'system';
   placePet();
   createWidget();
   buildTray();
@@ -250,13 +239,10 @@ app.on('window-all-closed', (e) => e.preventDefault?.());
 app.on('before-quit', () => { hub && hub.stop(); helper && helper.stop(); server && server.close(); });
 
 // ---------------------------------------------------------------- messages from the pages
-ipcMain.on('layout', (_e, m) => { if (['pet', 'bubble', 'panel'].includes(m) && m !== mode) { mode = m; applyLayout(); } });
-ipcMain.on('drag', (_e, dx, dy) => { pet.x += dx; pet.y += dy; clampPet(); const { b } = bounds(); win.setBounds(b); });
-ipcMain.on('drag:end', () => {
-  const d = screen.getDisplayNearestPoint({ x: Math.round(pet.x), y: Math.round(pet.y) });
-  store.set({ display_id: d.id, pos: { x: Math.round(pet.x - d.workArea.x), y: Math.round(pet.y - d.workArea.y) } });
-  applyLayout();
-});
+ipcMain.on('layout', (_e, m) => { if (['tucked', 'nudge', 'open'].includes(m)) { mode = m; applyLayout(); } });
+// Muncher slides up and down his edge
+ipcMain.on('drag', (_e, _dx, dy) => { if (mode === 'open') return; handleY += dy; clampPet(); applyLayout(); });
+ipcMain.on('drag:end', () => { store.set({ pos: { y: Math.round(handleY - display().workArea.y) } }); applyLayout(); });
 ipcMain.on('settings:open', (_e, tab) => openSettings(tab));
 ipcMain.handle('act', async (_e, name, args) => {
   if (DEMO) return { ok: true, demo: true };
@@ -269,11 +255,12 @@ ipcMain.handle('cfg:set', (_e, changes) => {
   for (const k of ['adguard_password', 'ha_token']) if (k in clean && !clean[k]) delete clean[k];   // blank keeps the saved one
   store.set(clean);
   hub.rebuild();
-  if (['pet_scale', 'zoom', 'display_id'].some((k) => k in clean && clean[k] !== before[k])) {
+  if (['pet_scale', 'zoom', 'display_id', 'edge'].some((k) => k in clean && clean[k] !== before[k])) {
     if ('display_id' in clean) store.set({ pos: null });
     placePet(); applyLayout();
   }
   if ('start_with_windows' in clean) loginItem();
+  if ('theme' in clean) nativeTheme.themeSource = ['light', 'dark'].includes(clean.theme) ? clean.theme : 'system';
   if ('api_port' in clean && clean.api_port !== before.api_port && server) { server.close(); server = startServer(hub, +clean.api_port || 8787); }
   refreshAll();
   return store.public();

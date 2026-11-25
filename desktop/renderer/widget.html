@@ -6,20 +6,29 @@
 <title>Piholegotchi</title>
 <link rel="stylesheet" href="widget.css">
 </head>
-<body class="side-left">
-  <div id="panel" hidden role="dialog" aria-label="Muncher's panel">
-    <div class="pbar">
-      <div class="name" id="pname"></div>
-      <div class="dots" id="dots"></div>
-      <button class="ibtn" id="prev" aria-label="Previous screen"><svg width="14" height="14" viewBox="0 0 7 7" shape-rendering="crispEdges"><path fill="currentColor" d="M4 0h1v1H4zM3 1h1v1H3zM2 2h1v1H2zM1 3h1v1H1zM2 4h1v1H2zM3 5h1v1H3zM4 6h1v1H4z"/></svg></button>
-      <button class="ibtn" id="next" aria-label="Next screen"><svg width="14" height="14" viewBox="0 0 7 7" shape-rendering="crispEdges"><path fill="currentColor" d="M2 0h1v1H2zM3 1h1v1H3zM4 2h1v1H4zM5 3h1v1H5zM4 4h1v1H4zM3 5h1v1H3zM2 6h1v1H2z"/></svg></button>
-      <button class="ibtn" id="gear" aria-label="Settings"><svg width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><path fill="currentColor" d="M3 0h2v1H3zM1 1h1v1H1zM6 1h1v1H6zM2 2h4v4H2zM0 3h1v2H0zM7 3h1v2H7zM1 6h1v1H1zM6 6h1v1H6zM3 7h2v1H3z"/><path fill="#dedcd2" d="M3 3h2v2H3z"/></svg></button>
-      <button class="ibtn" id="close" aria-label="Close the panel"><svg width="14" height="14" viewBox="0 0 7 7" shape-rendering="crispEdges"><path fill="currentColor" d="M0 0h1v1H0zM6 0h1v1H6zM1 1h1v1H1zM5 1h1v1H5zM2 2h1v1H2zM4 2h1v1H4zM3 3h1v1H3zM2 4h1v1H2zM4 4h1v1H4zM1 5h1v1H1zM5 5h1v1H5zM0 6h1v1H0zM6 6h1v1H6z"/></svg></button>
+<body class="edge-right mode-tucked">
+  <div id="drawer" class="drawer" hidden role="dialog" aria-label="Muncher's drawer">
+    <aside class="homecol" id="homecol">
+      <canvas id="petc" width="140" height="100" aria-label="Muncher"></canvas>
+      <div class="name">Muncher</div>
+      <div class="status" id="status"></div>
+      <div class="says" id="says"></div>
+      <span class="sp"></span>
+      <div class="foot">
+        <button class="tuck" id="tuck"><span>Tuck away</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+        <button class="ibtn" id="gear" aria-label="Settings"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+      </div>
+    </aside>
+    <div class="maincol">
+      <div class="tabs" id="tabs" role="tablist" aria-label="Muncher's tabs"></div>
+      <div class="page" id="page" role="tabpanel"></div>
     </div>
-    <div id="track"></div>
   </div>
-  <div id="bubble" hidden role="button" tabindex="0"><div class="t" id="bt"></div><div class="m" id="bm"></div><button class="x" id="bx" aria-label="Dismiss">X</button></div>
-  <div id="pet" role="button" tabindex="0" aria-label="Muncher. Tap to open the panel, hold to move him"><canvas id="petc" width="140" height="100"></canvas></div>
+
+  <div id="peek" class="peek">
+    <div class="bubble" id="bubble" hidden role="button" tabindex="0"><b id="bt"></b><span id="bm"></span><button class="x" id="bx" aria-label="Dismiss"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="handle" id="handle" role="button" tabindex="0" aria-label="Muncher. Tap to slide the drawer out, hold to move him up or down"><canvas id="peekc" width="140" height="100"></canvas><span class="dot" id="dot" hidden></span></div>
+  </div>
   <script src="muncher.js"></script>
   <script src="demo.js"></script>
   <script src="screens.js"></script>

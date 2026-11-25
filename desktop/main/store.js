@@ -9,9 +9,11 @@ const SECRET_KEYS = ['adguard_password', 'ha_token', 'spotify_refresh'];
 const DEFAULTS = {
   // widget
   display_id: null,            // which screen Muncher lives on (null = find the touchscreen)
-  pos: null,                   // {x, y} of the pet window's bottom-right corner, relative to that screen
-  pet_scale: 2,                // 2, 3 or 4 screen pixels per Muncher pixel
-  zoom: 1,                     // panel size
+  pos: null,                   // {y} of Muncher's handle on the screen edge, relative to that screen
+  edge: 'right',               // which edge of the screen the drawer slides out from
+  theme: 'system',             // system, light or dark
+  pet_scale: 2,                // how big Muncher is when peeking: 2, 3 or 4
+  zoom: 1,                     // drawer size
   start_with_windows: true,
   screens: {},                 // screen id -> false to hide it
 

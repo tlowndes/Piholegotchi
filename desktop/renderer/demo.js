@@ -17,7 +17,7 @@
   const h = new Date().getHours();
   window.DEMO_STATE = () => ({
     now: Date.now(), demo: true, night: false, mood: 'content', crown: false, shades: false, phones: true,
-    nudges: [{ id: 'bins:demo', title: 'BIN DAY TOMORROW', text: 'Black bin out tonight.', screen: 'bins', prio: 4 }],
+    nudges: [{ id: 'bins:demo', title: 'BIN DAY TOMORROW', text: 'Black bin out tonight.', screen: 'bins', prio: 4 }, { id: 'brk:demo', title: '1H 52M STRAIGHT', text: 'Stretch? Water?', screen: 'brk', prio: 5 }, { id: 'rem:demo', title: 'PLANTS', text: 'Water the monstera.', screen: 'rem', prio: 3 }],
     screens: {},
     configured: { ads: true, spotify: true, weather: true, server: true, calendar: true, home: true, door: true, capture: true, helper: true, network: true },
     ads: { online: true, note: '', total: 15210, blocked: 2710, percent: 17.8, today: 2710, ate: 0,
