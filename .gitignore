@@ -5,3 +5,5 @@ live.png
 preview/
 .env
 piholegotchi/VERSION
+desktop/node_modules/
+desktop/dist/

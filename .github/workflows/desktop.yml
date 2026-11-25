@@ -1,0 +1,53 @@
+name: Build Windows widget
+
+# Pushes to main publish a release with the installer.
+# Pushes to other branches build it and attach it to the run, as a check.
+on:
+  push:
+    paths: ["desktop/**", ".github/workflows/desktop.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: desktop
+    env:
+      TAG: desktop-v2.0.${{ github.run_number }}
+      PUBLISH: ${{ github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - name: Version
+        shell: bash
+        run: npm version --no-git-tag-version "2.0.${{ github.run_number }}"
+      - name: Build installer
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Piholegotchi-Setup
+          path: desktop/dist/Piholegotchi-Setup-*.exe
+          if-no-files-found: error
+      - name: Release
+        if: env.PUBLISH == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" dist/Piholegotchi-Setup-*.exe \
+            --title "Muncher for Windows $TAG" \
+            --notes "Run the installer on the PC with the touchscreen. Muncher appears in the corner of that screen; tap him, then the cog, to connect things. Windows SmartScreen may warn because the app isn't signed: choose More info, then Run anyway." \
+            --latest=false

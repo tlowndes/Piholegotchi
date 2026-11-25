@@ -12,6 +12,8 @@ A Raspberry Pi Zero W sits on the shelf and reads stats from [AdGuard Home](http
   <img src="docs/screens/muncher-stuffed.png" width="375" alt="Muncher screen: a round creature chewing ads beside the count of ads blocked today">
 </p>
 
+> **New: Muncher for Windows.** A desk-pet version for a touchscreen monitor lives in [`desktop/`](desktop/README.md). It fetches everything itself, so the Pi is optional.
+
 ## Design
 
 The panel is 250 × 122 pixels, black or white, with no greys. Every screen is drawn at that native size, so what you see above is exactly what the panel shows, scaled up 3×.

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Piholegotchi settings</title>
+<link rel="stylesheet" href="widget.css">
+<link rel="stylesheet" href="settings.css">
+</head>
+<body class="settings">
+  <nav id="tabs" aria-label="Settings sections">
+    <div class="brand"><canvas id="logo" width="140" height="100" aria-hidden="true"></canvas><span class="px">Piholegotchi</span></div>
+    <button data-tab="welcome">Start here</button>
+    <button data-tab="muncher">Muncher</button>
+    <button data-tab="ads">Ads and music</button>
+    <button data-tab="home">Home and server</button>
+    <button data-tab="day">Your day</button>
+    <button data-tab="desk">Desk</button>
+  </nav>
+  <main>
+    <!-- ======================================================= start -->
+    <section data-pane="welcome">
+      <h1>Hello. I’m Muncher.</h1>
+      <p class="lead">I eat the ads your network blocks and keep an eye on your day from a window on your smaller screen. Connect what you use; anything you skip stays hidden.</p>
+      <div class="card">
+        <h2>Coming from the Pi?</h2>
+        <p>On the Pi’s settings page, go to <b>Device › Download backup</b>, then load that file here. AdGuard, weather, calendar, Home Assistant, bins and reminders come across. Spotify connects fresh, so the Pi stays signed in too.</p>
+        <div class="row"><button class="btn hot" id="import">Load a Pi backup</button><span class="msg" id="importMsg" role="status"></span></div>
+      </div>
+      <div class="card">
+        <h2>What’s connected</h2>
+        <div id="status" class="status"></div>
+      </div>
+      <div class="card">
+        <h2>Updates</h2>
+        <p>New versions come from GitHub. Muncher checks every few hours and says when one’s ready.</p>
+        <div class="row"><button class="btn" id="updCheck">Check for updates</button><button class="btn hot" id="updInstall" hidden>Install</button><span class="msg" id="updMsg" role="status"></span></div>
+        <p class="hint" id="version"></p>
+      </div>
+    </section>
+
+    <!-- ======================================================= muncher -->
+    <section data-pane="muncher" hidden>
+      <h1>Muncher</h1>
+      <div class="card">
+        <h2>His window</h2>
+        <div class="two"><label>Opens on<select data-k="display_id" data-type="num" id="displays"></select></label>
+        <label>Look<select data-k="theme"><option value="system">Match Windows</option><option value="light">Light</option><option value="dark">Dark</option></select></label></div>
+        <label>Size of everything<select data-k="zoom" data-type="num"><option value="0.8">Compact</option><option value="1">Normal</option><option value="1.2">Big</option><option value="1.4">Huge</option></select></label>
+        <label class="check"><input type="checkbox" data-k="on_top"> Keep him on top of other windows</label>
+        <label class="check"><input type="checkbox" data-k="close_to_tray"> Closing the window hides him in the tray (so Flight Deck and nudges keep working)</label>
+        <label class="check"><input type="checkbox" data-k="start_with_windows"> Start with Windows, waiting in the tray</label>
+        <div class="row"><button class="btn hot" data-save>Save</button><button class="btn" id="corner">Move him to that screen</button><span class="msg" role="status"></span></div>
+        <p class="hint">Muncher is a normal window: drag it to your smaller screen, resize it, and he’ll open there next time. The tray icon shows or hides him. Stroke him to say hello, and drop a link on him to block that site.</p>
+      </div>
+      <div class="card">
+        <h2>Moods</h2>
+        <label class="check"><input type="checkbox" data-k="muncher_party"> Dance when today beats the best day</label>
+        <label>Starving face after blocking’s been off for<select data-k="starve_minutes" data-type="num"><option value="0">Never</option><option value="15">15 min</option><option value="30">30 min</option><option value="60">1 hour</option></select></label>
+        <label class="check"><input type="checkbox" data-k="night"> Night mode: nightcap on, nudges held</label>
+        <div class="two"><label>From<input type="time" data-k="night_from"></label><label>Until<input type="time" data-k="night_to"></label></div>
+        <div class="row"><button class="btn hot" data-save>Save</button><button class="btn" id="party">Show me a party</button><span class="msg" role="status"></span></div>
+      </div>
+      <div class="card">
+        <h2>In his window</h2>
+        <p class="hint">Untick anything you don’t want. Things that aren’t connected hide by themselves, and a tab with nothing in it disappears.</p>
+        <div id="screens" class="grid3"></div>
+        <div class="row"><button class="btn hot" id="saveScreens">Save</button><span class="msg" role="status"></span></div>
+      </div>
+    </section>
+
+    <!-- ======================================================= ads and music -->
+    <section data-pane="ads" hidden>
+      <h1>Ads and music</h1>
+      <div class="card">
+        <h2>AdGuard Home</h2>
+        <label>Address<input data-k="adguard_url" placeholder="http://192.168.1.20:3000" spellcheck="false"></label>
+        <div class="two"><label>Username<input data-k="adguard_username" autocomplete="off" spellcheck="false"></label><label>Password<input type="password" data-k="adguard_password" autocomplete="off" placeholder="Leave blank to keep it"></label></div>
+        <label>The Pause button on the Ads tab lasts<select data-k="pause_minutes" data-type="num"><option value="5">5 min</option><option value="15">15 min</option><option value="30">30 min</option><option value="60">1 hour</option></select></label>
+        <div class="row"><button class="btn" data-test="adguard">Test</button><button class="btn hot" data-save>Save</button><span class="msg" role="status"></span></div>
+      </div>
+      <div class="card">
+        <h2>Spotify</h2>
+        <p>Use the same Spotify app as the Pi, or make one at <a href="https://developer.spotify.com/dashboard" target="_blank">developer.spotify.com</a>. Its redirect URI must be <code>http://127.0.0.1:8888/callback</code>.</p>
+        <label>Client ID<input data-k="spotify_client_id" spellcheck="false"></label>
+        <div class="row"><button class="btn hot" id="spotify">Connect Spotify</button><button class="btn" id="spotifyForget">Disconnect</button><span class="msg" id="spotifyMsg" role="status"></span></div>
+        <p class="hint">Play, pause and skip need Spotify Premium.</p>
+      </div>
+    </section>
+
+    <!-- ======================================================= home and server -->
+    <section data-pane="home" hidden>
+      <h1>Home and server</h1>
+      <div class="card">
+        <h2>Home Assistant</h2>
+        <p>Make a long-lived token in Home Assistant under <b>Profile › Security</b>.</p>
+        <label>Address<input data-k="ha_url" placeholder="http://192.168.1.20:8123" spellcheck="false"></label>
+        <label>Token<input type="password" data-k="ha_token" placeholder="Leave blank to keep it" autocomplete="off"></label>
+        <div class="row"><button class="btn hot" id="haConnect">Connect and pick things</button><span class="msg" id="haMsg" role="status"></span></div>
+        <div id="haPick" hidden>
+          <h3>Up to five things for the Home tab</h3>
+          <input id="haFilter" placeholder="Filter, e.g. light or kitchen" spellcheck="false">
+          <div id="haList" class="pick"></div>
+          <div class="two"><label>Doorbell (turns on when someone rings)<select id="haDoorbell"></select></label><label>Camera for the snapshot<select id="haCamera"></select></label></div>
+          <div class="row"><button class="btn hot" id="haSave">Save</button><span class="msg" role="status"></span></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Server health</h2>
+        <p>Install Glances from the ZimaOS app store.</p>
+        <label>Glances address<input data-k="server_url" placeholder="http://192.168.1.20:61208" spellcheck="false"></label>
+        <label class="check"><input type="checkbox" data-k="watch_network"> Tell me when a new device joins the wifi (uses AdGuard)</label>
+        <div class="row"><button class="btn" data-test="glances">Test</button><button class="btn hot" data-save>Save</button><span class="msg" role="status"></span></div>
+      </div>
+    </section>
+
+    <!-- ======================================================= your day -->
+    <section data-pane="day" hidden>
+      <h1>Your day</h1>
+      <div class="card">
+        <h2>Weather</h2>
+        <div class="row"><input id="place" placeholder="Town or city, e.g. Bristol" style="flex:1"><button class="btn hot" id="findPlace">Find and save</button></div>
+        <span class="msg" id="placeMsg" role="status"></span>
+      </div>
+      <div class="card">
+        <h2>Calendar</h2>
+        <p>In Proton Calendar: <b>Settings › Calendars › Share › Share with anyone</b>, copy the link.</p>
+        <label>Shared calendar link<input data-k="calendar_url" placeholder="https://calendar.proton.me/api/calendar/v1/url/…" spellcheck="false"></label>
+        <label>Heads-up before an event<select data-k="calendar_heads_up" data-type="num"><option value="0">None</option><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="30">30 min</option></select></label>
+        <div class="row"><button class="btn hot" data-save>Save</button><span class="msg" role="status"></span></div>
+      </div>
+      <div class="card">
+        <h2>Bins</h2>
+        <p class="hint">Muncher nudges you from 4pm the night before.</p>
+        <div id="bins" class="rows"></div>
+        <div class="row"><button class="btn" id="addBin">Add a bin</button><button class="btn hot" id="saveBins">Save</button><span class="msg" role="status"></span></div>
+      </div>
+      <div class="card">
+        <h2>Plants, pets and reminders</h2>
+        <div id="rems" class="rows"></div>
+        <div class="row"><button class="btn" id="addRem">Add a reminder</button><button class="btn hot" id="saveRems">Save</button><span class="msg" role="status"></span></div>
+      </div>
+    </section>
+
+    <!-- ======================================================= desk -->
+    <section data-pane="desk" hidden>
+      <h1>Desk</h1>
+      <div class="card">
+        <h2>Quick capture</h2>
+        <p>Notes you type in Quick capture, on the Focus tab, are added to the end of this Obsidian note.</p>
+        <div class="row"><input data-k="inbox_file" id="inbox" readonly placeholder="No note picked" style="flex:1"><button class="btn hot" id="pickInbox">Pick a note</button></div>
+      </div>
+      <div class="card">
+        <h2>Looking after you</h2>
+        <label>Nudge me to take a break after<select data-k="break_after" data-type="num"><option value="0">Never</option><option value="45">45 min</option><option value="60">1 hour</option><option value="90">90 min</option><option value="120">2 hours</option></select></label>
+        <label>Daily water goal<select data-k="water_goal" data-type="num"><option value="1500">1.5 L</option><option value="2000">2 L</option><option value="2500">2.5 L</option><option value="3000">3 L</option></select></label>
+        <label>During Focus, these count as wandering off<input data-k="distractions" spellcheck="false"></label>
+        <label class="check"><input type="checkbox" data-k="meeting_mode"> Hold nudges while my mic or camera is on</label>
+        <label class="check"><input type="checkbox" data-k="clipboard" data-default="true"> Keep my last 5 copies on the Focus tab (memory only, never saved)</label>
+        <div class="row"><button class="btn hot" data-save>Save</button><span class="msg" role="status"></span></div>
+      </div>
+      <div class="card">
+        <h2>Flight Deck and Home Assistant messages</h2>
+        <p>Point these at this PC instead of the Pi:</p>
+        <ul class="addr" id="addrs"></ul>
+        <label>Port<input type="number" data-k="api_port" data-type="num" min="1024" max="65535"></label>
+        <p class="hint">Windows may ask whether Piholegotchi can use your network. Allow private networks so your phone can reach it.</p>
+        <div class="row"><button class="btn hot" data-save>Save</button><span class="msg" role="status"></span></div>
+      </div>
+    </section>
+  </main>
+  <script src="muncher.js"></script>
+  <script src="screens.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>
