@@ -1,6 +1,6 @@
-// Piholegotchi v2: Muncher on your touchscreen.
-// One small always-on-top window holds Muncher on the screen edge; it grows to show a speech bubble or the drawer.
-const { app, BrowserWindow, Tray, Menu, ipcMain, screen, shell, dialog, clipboard, powerMonitor, safeStorage, nativeImage, nativeTheme } = require('electron');
+// Piholegotchi v2: Muncher on your desk.
+// A normal window you can put on any screen; it remembers where you left it and hides to the tray when closed.
+const { app, BrowserWindow, Tray, Menu, ipcMain, screen, shell, dialog, clipboard, powerMonitor, safeStorage, nativeImage, nativeTheme, Notification } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { Store } = require('./store');
@@ -14,17 +14,17 @@ const { Glances } = require('./sources/glances');
 const { HomeAssistant } = require('./sources/homeassistant');
 
 const DEMO = process.argv.includes('--demo');
+const HIDDEN = process.argv.includes('--hidden');     // started with Windows: wait in the tray
 const ROOT = path.join(__dirname, '..');
 const ICON = path.join(ROOT, 'renderer', 'icon.png');
-const DRAWER_W = 880, DRAWER_H = 480, BUBBLE_W = 272;
+const BASE_W = 900, BASE_H = 540, MIN_W = 620, MIN_H = 400, BAR_H = 44;
 
 if (!app.requestSingleInstanceLock()) app.quit();
 
 let store, hub, helper, win, settingsWin, tray, server;
-let mode = 'tucked';     // tucked (peeking from the edge), nudge (peeking with a speech bubble), open (drawer out)
-let handleY = null;      // top of Muncher's handle on the edge, in screen pixels
+let quitting = false;
 
-// ---------------------------------------------------------------- where Muncher lives
+// ---------------------------------------------------------------- where the window goes
 function display() {
   const all = screen.getAllDisplays();
   const id = store.get('display_id');
@@ -34,64 +34,88 @@ function display() {
     || screen.getPrimaryDisplay();
 }
 
-const edge = () => (store.get('edge') === 'left' ? 'left' : 'right');
+const zoom = () => +store.get('zoom') || 1;
 
-function handleSize() {
-  const k = +store.get('pet_scale') || 2;
-  return { w: 33 * k, h: 48 * k, k };
+// centred on the chosen screen, at a comfortable size
+function freshBounds() {
+  const d = display().workArea, z = zoom();
+  const width = Math.min(Math.round(BASE_W * z), d.width), height = Math.min(Math.round(BASE_H * z), d.height);
+  return { x: d.x + Math.round((d.width - width) / 2), y: d.y + Math.round((d.height - height) / 2), width, height };
 }
 
-function drawerSize(d) {
-  const z = +store.get('zoom') || 1;
-  return { w: Math.min(Math.round(DRAWER_W * z), d.width - 40), h: Math.min(Math.round(DRAWER_H * z), d.height - 24) };
+// the saved spot, as long as enough of it is still on a screen to grab
+function onScreen(b) {
+  return screen.getAllDisplays().some(({ workArea: w }) => {
+    const ix = Math.min(b.x + b.width, w.x + w.width) - Math.max(b.x, w.x);
+    const iy = Math.min(b.y + b.height, w.y + w.height) - Math.max(b.y, w.y);
+    return ix >= 120 && iy >= 60;
+  });
 }
 
-function placePet() {
-  const d = display().workArea;
-  const { h } = handleSize();
-  const p = store.get('pos');
-  handleY = p && typeof p.y === 'number' ? d.y + p.y : d.y + d.height - h - 140;
-  clampPet();
+function startBounds() {
+  const b = store.get('win');
+  return b && [b.x, b.y, b.width, b.height].every(Number.isFinite) && onScreen(b) ? b : freshBounds();
 }
 
-function clampPet() {
-  const d = display().workArea;
-  const { h } = handleSize();
-  handleY = Math.min(Math.max(handleY, d.y + 8), d.y + d.height - h - 8);
-}
-
-function bounds() {
-  const d = display().workArea;
-  const { w: hw, h: hh } = handleSize();
-  const at = (W, H, y) => ({ x: edge() === 'right' ? d.x + d.width - W : d.x, y: Math.round(Math.min(Math.max(y, d.y), d.y + d.height - H)), width: W, height: H });
-  if (mode === 'open') { const s = drawerSize(d); return at(s.w, s.h, handleY + hh / 2 - s.h / 2); }
-  if (mode === 'nudge') { const H = Math.max(hh, 150); return at(hw + BUBBLE_W, H, handleY + hh / 2 - H / 2); }
-  return at(hw, hh, handleY);
-}
-
-function applyLayout() {
+function moveToScreen() {
   if (!win) return;
-  const b = bounds();
-  win.setBounds(b);
-  const { w, h, k } = handleSize();
-  win.webContents.send('layout', { mode, edge: edge(), handleW: w, handleH: h, k, zoom: +store.get('zoom') || 1,
-    winW: b.width, winH: b.height, handleTop: Math.round(handleY - b.y) });
+  if (win.isMaximized()) win.unmaximize();
+  win.setBounds(freshBounds());
+  showWin();
+}
+
+function rememberBounds() {
+  if (!win || win.isDestroyed() || win.isMinimized()) return;
+  const b = win.getNormalBounds();
+  store.set({ win: { x: b.x, y: b.y, width: b.width, height: b.height, max: win.isMaximized() } });
+}
+
+// window chrome colours follow the light or dark look
+const chrome = () => (nativeTheme.shouldUseDarkColors
+  ? { bg: '#1e2029', color: '#1e2029', symbolColor: '#eef0f5' }
+  : { bg: '#f6f7fa', color: '#f6f7fa', symbolColor: '#1d1e24' });
+
+function paintChrome() {
+  const c = chrome();
+  for (const w of [win, settingsWin]) if (w && !w.isDestroyed()) w.setBackgroundColor(c.bg);
+  if (win && !win.isDestroyed() && win.setTitleBarOverlay) {
+    try { win.setTitleBarOverlay({ color: c.color, symbolColor: c.symbolColor, height: Math.round(BAR_H * zoom()) }); } catch { /* not supported here */ }
+  }
+}
+
+function showWin() {
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.show(); win.focus();
 }
 
 // ---------------------------------------------------------------- windows
 function createWidget() {
+  const c = chrome();
+  const b = startBounds();
   win = new BrowserWindow({
-    ...bounds().b, transparent: true, frame: false, resizable: false, maximizable: false, fullscreenable: false,
-    alwaysOnTop: true, skipTaskbar: true, hasShadow: false, backgroundColor: '#00000000', show: false,
-    title: 'Piholegotchi', icon: ICON,
-    webPreferences: { preload: path.join(ROOT, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
+    x: b.x, y: b.y, width: b.width, height: b.height, minWidth: MIN_W, minHeight: MIN_H,
+    show: false, title: 'Muncher', icon: ICON, backgroundColor: c.bg, autoHideMenuBar: true,
+    titleBarStyle: 'hidden', titleBarOverlay: { color: c.color, symbolColor: c.symbolColor, height: Math.round(BAR_H * zoom()) },
+    webPreferences: { preload: path.join(ROOT, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, zoomFactor: zoom() },
   });
-  win.setAlwaysOnTop(true, 'floating');
+  win.setAlwaysOnTop(!!store.get('on_top'));
   win.loadFile(path.join(ROOT, 'renderer', 'widget.html'), { query: DEMO ? { demo: '1' } : {} });
-  win.once('ready-to-show', () => { applyLayout(); win.showInactive(); });
-  win.webContents.on('did-finish-load', () => { applyLayout(); if (hub) hub.emit(); });
+  win.once('ready-to-show', () => {
+    if (b.max) win.maximize();
+    if (!HIDDEN) win.show();
+  });
+  win.webContents.on('did-finish-load', () => { win.webContents.setZoomFactor(zoom()); if (hub) hub.emit(); });
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
-  win.on('closed', () => { win = null; });
+  let t;
+  const later = () => { clearTimeout(t); t = setTimeout(rememberBounds, 400); };
+  for (const ev of ['move', 'resize', 'maximize', 'unmaximize']) win.on(ev, later);
+  for (const ev of ['show', 'hide', 'minimize', 'restore']) win.on(ev, () => { const open = win.isVisible() && !win.isMinimized(); hub && hub.act('panel', { open }); tray && tray.setContextMenu(trayMenu()); });
+  win.on('close', (e) => {
+    rememberBounds();
+    if (!quitting && store.get('close_to_tray') !== false) { e.preventDefault(); win.hide(); }
+  });
+  win.on('closed', () => { win = null; if (!quitting) app.quit(); });
 }
 
 function openSettings(tab) {
@@ -99,7 +123,7 @@ function openSettings(tab) {
   const prim = screen.getPrimaryDisplay().workArea;
   settingsWin = new BrowserWindow({
     width: 940, height: 760, x: prim.x + Math.round((prim.width - 940) / 2), y: prim.y + Math.round((prim.height - 760) / 2),
-    title: 'Piholegotchi settings', icon: ICON, backgroundColor: nativeTheme.shouldUseDarkColors ? '#17181e' : '#eef0f4', autoHideMenuBar: true,
+    title: 'Piholegotchi settings', icon: ICON, backgroundColor: chrome().bg, autoHideMenuBar: true,
     webPreferences: { preload: path.join(ROOT, 'preload.js'), contextIsolation: true, nodeIntegration: false },
   });
   settingsWin.loadFile(path.join(ROOT, 'renderer', 'settings.html'), { hash: tab || '' });
@@ -107,31 +131,52 @@ function openSettings(tab) {
   settingsWin.on('closed', () => { settingsWin = null; });
 }
 
+// while his window is hidden, new nudges (bins, doorbell, a break) come as Windows notifications
+const seenNudges = new Set();
+let firstState = true;
+function notifyNudges(s) {
+  const away = !win || !win.isVisible() || win.isMinimized();
+  for (const n of s.nudges || []) {
+    if (seenNudges.has(n.id)) continue;
+    seenNudges.add(n.id);
+    if (firstState || !away || DEMO || !Notification.isSupported()) continue;
+    const title = n.title === n.title.toUpperCase() ? n.title.charAt(0) + n.title.slice(1).toLowerCase() : n.title;
+    const note = new Notification({ title, body: n.text || '', icon: ICON });
+    note.on('click', showWin);
+    note.show();
+  }
+  firstState = false;
+}
+
 function sendState(s) {
   // JSON round trip: anything that can't cross to the window (a stray Promise, a function) is dropped,
   // instead of the whole update failing and Muncher sitting there asleep
   s = JSON.parse(JSON.stringify(s));
+  notifyNudges(s);
   for (const w of [win, settingsWin]) if (w && !w.isDestroyed()) w.webContents.send('state', s);
+}
+
+function trayMenu() {
+  const shown = win && win.isVisible() && !win.isMinimized();
+  return Menu.buildFromTemplate([
+    { label: shown ? 'Hide Muncher' : 'Show Muncher', click: () => (shown ? win.hide() : showWin()) },
+    { label: 'Settings', click: () => openSettings() },
+    { label: 'Check for updates', click: () => openSettings('welcome') },
+    { label: 'Move him to his screen', click: moveToScreen },
+    { type: 'separator' },
+    { label: 'Quit', click: () => app.quit() },
+  ]);
 }
 
 function buildTray() {
   tray = new Tray(nativeImage.createFromPath(ICON).resize({ width: 16, height: 16 }));
   tray.setToolTip('Piholegotchi');
-  const menu = () => Menu.buildFromTemplate([
-    { label: 'Slide the drawer out', click: () => { win.showInactive(); win.webContents.send('open', 'open'); } },
-    { label: 'Settings', click: () => openSettings() },
-    { label: win && win.isVisible() ? 'Hide Muncher' : 'Show Muncher', click: () => { if (win.isVisible()) win.hide(); else win.showInactive(); tray.setContextMenu(menu()); } },
-    { label: 'Check for updates', click: () => openSettings('welcome') },
-    { label: 'Put Muncher back in his spot', click: () => { store.set({ pos: null }); placePet(); applyLayout(); } },
-    { type: 'separator' },
-    { label: 'Quit', click: () => app.quit() },
-  ]);
-  tray.setContextMenu(menu());
-  tray.on('click', () => { if (!win.isVisible()) win.showInactive(); win.webContents.send('open', 'toggle'); });
+  tray.setContextMenu(trayMenu());
+  tray.on('click', () => (win && win.isVisible() && !win.isMinimized() && win.isFocused() ? win.hide() : showWin()));
 }
 
 function loginItem() {
-  if (process.platform === 'win32' && app.isPackaged) app.setLoginItemSettings({ openAtLogin: !!store.get('start_with_windows') });
+  if (process.platform === 'win32' && app.isPackaged) app.setLoginItemSettings({ openAtLogin: !!store.get('start_with_windows'), args: ['--hidden'] });
 }
 
 // ---------------------------------------------------------------- settings window tools
@@ -181,7 +226,7 @@ async function tool(name, a = {}) {
       return { ips, port: c.api_port };
     }
     case 'party': await hub.act('ads:party'); return { ok: true };
-    case 'corner': store.set({ pos: null }); placePet(); applyLayout(); return { ok: true };
+    case 'corner': moveToScreen(); return { ok: true };
     case 'open': shell.openExternal(a.url); return { ok: true };
     case 'update:check': return checkUpdates();
     case 'update:install': {
@@ -218,7 +263,6 @@ app.whenReady().then(() => {
   hub = new Hub({ store, helper, electron: { clipboard, powerMonitor, shell }, onState: sendState });
   hub.version = app.getVersion();
   nativeTheme.themeSource = ['light', 'dark'].includes(store.get('theme')) ? store.get('theme') : 'system';
-  placePet();
   createWidget();
   buildTray();
   loginItem();
@@ -230,19 +274,16 @@ app.whenReady().then(() => {
   }
   if (!DEMO && !store.get('adguard_url') && !store.get('weather_place')) setTimeout(() => openSettings('welcome'), 1500);
 
-  screen.on('display-removed', () => { placePet(); applyLayout(); });
-  screen.on('display-metrics-changed', () => { clampPet(); applyLayout(); });
+  // a screen unplugged: bring him back to one that's there
+  screen.on('display-removed', () => { if (win && !onScreen(win.getBounds())) moveToScreen(); });
+  nativeTheme.on('updated', paintChrome);
 });
 
-app.on('second-instance', () => { if (win) { win.showInactive(); win.webContents.send('open', 'open'); } });
+app.on('second-instance', showWin);
 app.on('window-all-closed', (e) => e.preventDefault?.());
-app.on('before-quit', () => { hub && hub.stop(); helper && helper.stop(); server && server.close(); });
+app.on('before-quit', () => { quitting = true; hub && hub.stop(); helper && helper.stop(); server && server.close(); });
 
 // ---------------------------------------------------------------- messages from the pages
-ipcMain.on('layout', (_e, m) => { if (['tucked', 'nudge', 'open'].includes(m)) { mode = m; applyLayout(); } });
-// Muncher slides up and down his edge
-ipcMain.on('drag', (_e, _dx, dy) => { if (mode === 'open') return; handleY += dy; clampPet(); applyLayout(); });
-ipcMain.on('drag:end', () => { store.set({ pos: { y: Math.round(handleY - display().workArea.y) } }); applyLayout(); });
 ipcMain.on('settings:open', (_e, tab) => openSettings(tab));
 ipcMain.handle('act', async (_e, name, args) => {
   if (DEMO) return { ok: true, demo: true };
@@ -255,12 +296,11 @@ ipcMain.handle('cfg:set', (_e, changes) => {
   for (const k of ['adguard_password', 'ha_token']) if (k in clean && !clean[k]) delete clean[k];   // blank keeps the saved one
   store.set(clean);
   hub.rebuild();
-  if (['pet_scale', 'zoom', 'display_id', 'edge'].some((k) => k in clean && clean[k] !== before[k])) {
-    if ('display_id' in clean) store.set({ pos: null });
-    placePet(); applyLayout();
-  }
+  if (win && 'zoom' in clean && clean.zoom !== before.zoom) { win.webContents.setZoomFactor(zoom()); paintChrome(); }
+  if (win && 'on_top' in clean) win.setAlwaysOnTop(!!clean.on_top);
+  if ('display_id' in clean && clean.display_id !== before.display_id) moveToScreen();
   if ('start_with_windows' in clean) loginItem();
-  if ('theme' in clean) nativeTheme.themeSource = ['light', 'dark'].includes(clean.theme) ? clean.theme : 'system';
+  if ('theme' in clean) { nativeTheme.themeSource = ['light', 'dark'].includes(clean.theme) ? clean.theme : 'system'; paintChrome(); }
   if ('api_port' in clean && clean.api_port !== before.api_port && server) { server.close(); server = startServer(hub, +clean.api_port || 8787); }
   refreshAll();
   return store.public();

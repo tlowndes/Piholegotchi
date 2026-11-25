@@ -1,4 +1,4 @@
-// The drawer's five tabs, built from the app's state. Each tab is a grid of tiles.
+// The five tabs in Muncher's window, built from the app's state. Each tab is a grid of tiles.
 // Tiles keep the old screen ids (ads, np, wx...) so "hide this" settings still apply.
 // Buttons say what they do with data-act (and data-a for their arguments, as JSON).
 (function () {

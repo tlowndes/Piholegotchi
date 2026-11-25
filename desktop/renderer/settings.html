@@ -21,7 +21,7 @@
     <!-- ======================================================= start -->
     <section data-pane="welcome">
       <h1>Hello. I’m Muncher.</h1>
-      <p class="lead">I eat the ads your network blocks and keep an eye on your day from the edge of your touchscreen. Connect what you use; anything you skip stays hidden.</p>
+      <p class="lead">I eat the ads your network blocks and keep an eye on your day from a window on your smaller screen. Connect what you use; anything you skip stays hidden.</p>
       <div class="card">
         <h2>Coming from the Pi?</h2>
         <p>On the Pi’s settings page, go to <b>Device › Download backup</b>, then load that file here. AdGuard, weather, calendar, Home Assistant, bins and reminders come across. Spotify connects fresh, so the Pi stays signed in too.</p>
@@ -43,15 +43,15 @@
     <section data-pane="muncher" hidden>
       <h1>Muncher</h1>
       <div class="card">
-        <h2>Where he lives</h2>
-        <label>Screen<select data-k="display_id" data-type="num" id="displays"></select></label>
-        <div class="two"><label>Edge<select data-k="edge"><option value="right">Right edge</option><option value="left">Left edge</option></select></label>
+        <h2>His window</h2>
+        <div class="two"><label>Opens on<select data-k="display_id" data-type="num" id="displays"></select></label>
         <label>Look<select data-k="theme"><option value="system">Match Windows</option><option value="light">Light</option><option value="dark">Dark</option></select></label></div>
-        <div class="two"><label>Muncher’s size on the edge<select data-k="pet_scale" data-type="num"><option value="2">Small</option><option value="3">Medium</option><option value="4">Large</option></select></label>
-        <label>Drawer size<select data-k="zoom" data-type="num"><option value="0.8">Compact</option><option value="1">Normal</option><option value="1.2">Big</option><option value="1.4">Huge</option></select></label></div>
-        <label class="check"><input type="checkbox" data-k="start_with_windows"> Start with Windows</label>
-        <div class="row"><button class="btn hot" data-save>Save</button><button class="btn" id="corner">Reset his spot</button><span class="msg" role="status"></span></div>
-        <p class="hint">Muncher peeks out from the edge of the screen. Tap him or swipe in to slide the drawer out, and swipe it back to tuck it away. Hold him for a moment, then slide up or down to move him along the edge. Stroke him in the drawer to say hello.</p>
+        <label>Size of everything<select data-k="zoom" data-type="num"><option value="0.8">Compact</option><option value="1">Normal</option><option value="1.2">Big</option><option value="1.4">Huge</option></select></label>
+        <label class="check"><input type="checkbox" data-k="on_top"> Keep him on top of other windows</label>
+        <label class="check"><input type="checkbox" data-k="close_to_tray"> Closing the window hides him in the tray (so Flight Deck and nudges keep working)</label>
+        <label class="check"><input type="checkbox" data-k="start_with_windows"> Start with Windows, waiting in the tray</label>
+        <div class="row"><button class="btn hot" data-save>Save</button><button class="btn" id="corner">Move him to that screen</button><span class="msg" role="status"></span></div>
+        <p class="hint">Muncher is a normal window: drag it to your smaller screen, resize it, and he’ll open there next time. The tray icon shows or hides him. Stroke him to say hello, and drop a link on him to block that site.</p>
       </div>
       <div class="card">
         <h2>Moods</h2>
@@ -62,7 +62,7 @@
         <div class="row"><button class="btn hot" data-save>Save</button><button class="btn" id="party">Show me a party</button><span class="msg" role="status"></span></div>
       </div>
       <div class="card">
-        <h2>In the drawer</h2>
+        <h2>In his window</h2>
         <p class="hint">Untick anything you don’t want. Things that aren’t connected hide by themselves, and a tab with nothing in it disappears.</p>
         <div id="screens" class="grid3"></div>
         <div class="row"><button class="btn hot" id="saveScreens">Save</button><span class="msg" role="status"></span></div>

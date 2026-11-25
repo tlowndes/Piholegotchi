@@ -8,12 +8,12 @@ const SECRET_KEYS = ['adguard_password', 'ha_token', 'spotify_refresh'];
 // Same names as the Pi's config.json, so a Pi backup imports straight in.
 const DEFAULTS = {
   // widget
-  display_id: null,            // which screen Muncher lives on (null = find the touchscreen)
-  pos: null,                   // {y} of Muncher's handle on the screen edge, relative to that screen
-  edge: 'right',               // which edge of the screen the drawer slides out from
+  display_id: null,            // which screen Muncher's window opens on (null = find the touchscreen)
+  win: null,                   // where the window was left: {x, y, width, height, max}
+  on_top: false,               // keep the window above other windows
+  close_to_tray: true,         // closing the window hides it to the tray instead of quitting
   theme: 'system',             // system, light or dark
-  pet_scale: 2,                // how big Muncher is when peeking: 2, 3 or 4
-  zoom: 1,                     // drawer size
+  zoom: 1,                     // text and tile size in the window
   start_with_windows: true,
   screens: {},                 // screen id -> false to hide it
 
@@ -98,7 +98,7 @@ class Store {
     }
     const keep = {};
     for (const [k, v] of Object.entries(json.config)) {
-      if (k in DEFAULTS && !['screens', 'pos', 'display_id', 'spotify_refresh', 'spotify_scope'].includes(k)) keep[k] = v;
+      if (k in DEFAULTS && !['screens', 'win', 'display_id', 'spotify_refresh', 'spotify_scope'].includes(k)) keep[k] = v;
     }
     this.set(keep);
     return Object.keys(keep).length;
